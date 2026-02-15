@@ -1324,6 +1324,35 @@ export default function AdminPage() {
     }
   };
 
+  // Clear all teacher payments (admin only)
+  const handleClearAllPayments = async () => {
+    if (!confirm('ATENÇÃO!\n\nDeseja realmente excluir TODOS os lançamentos de mensalidades?\n\nEsta ação não pode ser desfeita!')) return;
+    
+    setIsSaving(true);
+    try {
+      const paymentsSnapshot = await getDocs(collection(db, 'teacherPayments'));
+      let deletedCount = 0;
+      
+      for (const paymentDoc of paymentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'teacherPayments', paymentDoc.id));
+        deletedCount++;
+      }
+      
+      toast({ 
+        title: 'Lançamentos excluídos!', 
+        description: `${deletedCount} registros removidos` 
+      });
+      fetchData();
+    } catch (error) {
+      toast({ 
+        title: 'Erro ao excluir lançamentos', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Set Password handler
   const handleSetPassword = async (password: string) => {
     if (!selectedTeacher) return;
@@ -2104,15 +2133,27 @@ export default function AdminPage() {
                     className={`pl-10 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : ''}`}
                   />
                 </div>
-                <Button
-                  onClick={() => {
-                    setEditingPayment(null);
-                    setShowPaymentForm(true);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <DollarSign className="w-4 h-4 mr-2" /> Nova Mensalidade
-                </Button>
+                <div className="flex gap-2">
+                  {payments.length > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={handleClearAllPayments}
+                      disabled={isSaving}
+                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Limpar Tudo
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => {
+                      setEditingPayment(null);
+                      setShowPaymentForm(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <DollarSign className="w-4 h-4 mr-2" /> Nova Mensalidade
+                  </Button>
+                </div>
               </div>
 
               {/* Payments Table */}
