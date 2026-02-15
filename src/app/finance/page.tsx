@@ -254,6 +254,7 @@ export default function FinancePage() {
   const [clearFilter, setClearFilter] = useState<'all' | 'imported' | 'status'>('all');
   const [clearStatus, setClearStatus] = useState<string>('pending');
   const [isClearing, setIsClearing] = useState(false);
+  const [clearAllImported, setClearAllImported] = useState(false);
   const { toast } = useToast();
 
   const { user, loading, userData } = useAuth();
@@ -337,6 +338,59 @@ export default function FinancePage() {
 
   // Clear payments function (admin only)
   const handleClearPayments = async () => {
+    // If clearing all imported data from Base44
+    if (clearAllImported) {
+      if (!confirm('ATENÇÃO!\n\nDeseja realmente excluir TODOS os dados importados do Base44?\n\nIsso incluirá:\n- Alunos importados\n- Aulas importadas\n- Pagamentos importados\n\nEsta ação não pode ser desfeita!')) return;
+      
+      setIsClearing(true);
+      try {
+        let totalCount = 0;
+        
+        // Delete imported students
+        const studentsSnapshot = await getDocs(
+          query(collection(db, 'students'), where('importedFrom', '==', 'base44'))
+        );
+        for (const docSnap of studentsSnapshot.docs) {
+          await deleteDoc(doc(db, 'students', docSnap.id));
+          totalCount++;
+        }
+        
+        // Delete imported lessons
+        const lessonsSnapshot = await getDocs(
+          query(collection(db, 'lessons'), where('importedFrom', '==', 'base44'))
+        );
+        for (const docSnap of lessonsSnapshot.docs) {
+          await deleteDoc(doc(db, 'lessons', docSnap.id));
+          totalCount++;
+        }
+        
+        // Delete imported payments
+        const paymentsSnapshot = await getDocs(
+          query(collection(db, 'payments'), where('importedFrom', '==', 'base44'))
+        );
+        for (const docSnap of paymentsSnapshot.docs) {
+          await deleteDoc(doc(db, 'payments', docSnap.id));
+          totalCount++;
+        }
+        
+        toast({
+          title: 'Dados excluídos!',
+          description: `${totalCount} registros removidos (alunos, aulas e pagamentos importados)`
+        });
+        setShowClearModal(false);
+        setClearAllImported(false);
+        fetchData();
+      } catch (error) {
+        toast({
+          title: 'Erro ao excluir dados',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsClearing(false);
+      }
+      return;
+    }
+    
     // Determine which payments to delete based on filter
     let paymentsToDelete: Payment[] = [];
     let filterDescription = '';
@@ -723,87 +777,116 @@ export default function FinancePage() {
                   <div className="space-y-4">
                     {/* Filter Options */}
                     <div className={`p-4 rounded-xl space-y-3 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                      <label className="flex items-center gap-3 cursor-pointer">
+                      {/* Option to clear ALL imported data */}
+                      <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-700">
                         <input
-                          type="radio"
-                          name="clearFilter"
-                          value="all"
-                          checked={clearFilter === 'all'}
-                          onChange={() => setClearFilter('all')}
-                          className="w-4 h-4 text-red-600"
-                        />
-                        <div>
-                          <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            Todos os pagamentos
-                          </span>
-                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Excluir todos os {payments.length} registros
-                          </p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="clearFilter"
-                          value="imported"
-                          checked={clearFilter === 'imported'}
-                          onChange={() => setClearFilter('imported')}
-                          className="w-4 h-4 text-red-600"
-                        />
-                        <div>
-                          <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            Importados do Base44
-                          </span>
-                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Apenas pagamentos importados
-                          </p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="clearFilter"
-                          value="status"
-                          checked={clearFilter === 'status'}
-                          onChange={() => setClearFilter('status')}
+                          type="checkbox"
+                          checked={clearAllImported}
+                          onChange={(e) => setClearAllImported(e.target.checked)}
                           className="w-4 h-4 text-red-600 mt-1"
                         />
-                        <div className="flex-1">
-                          <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            Por status
+                        <div>
+                          <span className={`font-medium text-red-700 dark:text-red-300`}>
+                            🗑️ Limpar TODOS os dados importados do Base44
                           </span>
-                          {clearFilter === 'status' && (
-                            <select
-                              value={clearStatus}
-                              onChange={(e) => setClearStatus(e.target.value)}
-                              className={`w-full mt-2 px-3 py-2 rounded-lg border text-sm ${
-                                darkMode
-                                  ? 'bg-slate-600 border-slate-500 text-white'
-                                  : 'bg-white border-slate-200'
-                              }`}
-                            >
-                              <option value="pending">Pendentes ({payments.filter(p => p.status === 'pending').length})</option>
-                              <option value="paid">Pagos ({payments.filter(p => p.status === 'paid').length})</option>
-                              <option value="overdue">Atrasados ({payments.filter(p => p.status === 'overdue').length})</option>
-                              <option value="cancelled">Cancelados ({payments.filter(p => p.status === 'cancelled').length})</option>
-                            </select>
-                          )}
+                          <p className={`text-xs text-red-600 dark:text-red-400 mt-1`}>
+                            Isso incluirá: Alunos, Aulas e Pagamentos importados
+                          </p>
                         </div>
                       </label>
+
+                      <div className={`border-t ${darkMode ? 'border-slate-600' : 'border-slate-200'} pt-3`}>
+                        <p className={`text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Ou limpar apenas pagamentos:
+                        </p>
+                        
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="clearFilter"
+                            value="all"
+                            checked={clearFilter === 'all' && !clearAllImported}
+                            onChange={() => { setClearFilter('all'); setClearAllImported(false); }}
+                            disabled={clearAllImported}
+                            className="w-4 h-4 text-red-600"
+                          />
+                          <div>
+                            <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'} ${clearAllImported ? 'opacity-50' : ''}`}>
+                              Todos os pagamentos
+                            </span>
+                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Excluir todos os {payments.length} registros
+                            </p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer mt-2">
+                          <input
+                            type="radio"
+                            name="clearFilter"
+                            value="imported"
+                            checked={clearFilter === 'imported' && !clearAllImported}
+                            onChange={() => { setClearFilter('imported'); setClearAllImported(false); }}
+                            disabled={clearAllImported}
+                            className="w-4 h-4 text-red-600"
+                          />
+                          <div>
+                            <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'} ${clearAllImported ? 'opacity-50' : ''}`}>
+                              Importados do Base44
+                            </span>
+                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Apenas pagamentos importados
+                            </p>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start gap-3 cursor-pointer mt-2">
+                          <input
+                            type="radio"
+                            name="clearFilter"
+                            value="status"
+                            checked={clearFilter === 'status' && !clearAllImported}
+                            onChange={() => { setClearFilter('status'); setClearAllImported(false); }}
+                            disabled={clearAllImported}
+                            className="w-4 h-4 text-red-600 mt-1"
+                          />
+                          <div className="flex-1">
+                            <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'} ${clearAllImported ? 'opacity-50' : ''}`}>
+                              Por status
+                            </span>
+                            {clearFilter === 'status' && !clearAllImported && (
+                              <select
+                                value={clearStatus}
+                                onChange={(e) => setClearStatus(e.target.value)}
+                                className={`w-full mt-2 px-3 py-2 rounded-lg border text-sm ${
+                                  darkMode
+                                    ? 'bg-slate-600 border-slate-500 text-white'
+                                    : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <option value="pending">Pendentes ({payments.filter(p => p.status === 'pending').length})</option>
+                                <option value="paid">Pagos ({payments.filter(p => p.status === 'paid').length})</option>
+                                <option value="overdue">Atrasados ({payments.filter(p => p.status === 'overdue').length})</option>
+                                <option value="cancelled">Cancelados ({payments.filter(p => p.status === 'cancelled').length})</option>
+                              </select>
+                            )}
+                          </div>
+                        </label>
+                      </div>
                     </div>
 
                     {/* Warning */}
                     <div className={`p-3 rounded-lg ${darkMode ? 'bg-red-900/30 border border-red-700/50' : 'bg-red-50 border border-red-200'}`}>
                       <p className={`text-sm flex items-center gap-2 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
                         <AlertCircle className="w-4 h-4" />
-                        Esta ação não pode ser desfeita!
+                        {clearAllImported 
+                          ? 'Isso excluirá TODOS os dados importados: alunos, aulas e pagamentos!'
+                          : 'Esta ação não pode ser desfeita!'}
                       </p>
                     </div>
 
                     <div className="flex gap-3 pt-4">
-                      <Button type="button" variant="outline" onClick={() => setShowClearModal(false)} className="flex-1">
+                      <Button type="button" variant="outline" onClick={() => { setShowClearModal(false); setClearAllImported(false); }} className="flex-1">
                         Cancelar
                       </Button>
                       <Button
@@ -816,6 +899,8 @@ export default function FinancePage() {
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Excluindo...
                           </>
+                        ) : clearAllImported ? (
+                          'Excluir Todos os Dados'
                         ) : (
                           'Excluir Selecionados'
                         )}
