@@ -316,7 +316,7 @@ export default function StudentsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const { user, loading } = useAuth();
+  const { user, loading, userData } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -330,13 +330,18 @@ export default function StudentsPage() {
     } else if (user) {
       fetchStudents();
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, userData]);
 
   const fetchStudents = async () => {
     setIsLoading(true);
     try {
       const data = await firestoreService.getAll<Student>(COLLECTIONS.STUDENTS);
-      setStudents(data);
+      // Se não for admin, filtrar apenas os alunos do professor logado
+      if (userData?.role !== 'admin') {
+        setStudents(data.filter(s => s.teacherId === user?.uid));
+      } else {
+        setStudents(data);
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
     } finally {

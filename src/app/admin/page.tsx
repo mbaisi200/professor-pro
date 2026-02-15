@@ -1451,11 +1451,39 @@ export default function AdminPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este professor?')) return;
+    // Verificar se há dados vinculados
+    const studentsSnapshot = await getDocs(query(collection(db, 'students'), where('teacherId', '==', id)));
+    const lessonsSnapshot = await getDocs(query(collection(db, 'lessons'), where('teacherId', '==', id)));
+    const paymentsSnapshot = await getDocs(query(collection(db, 'payments'), where('teacherId', '==', id)));
+    
+    const totalLinked = studentsSnapshot.size + lessonsSnapshot.size + paymentsSnapshot.size;
+    
+    let confirmMessage = 'Deseja realmente excluir este professor?';
+    if (totalLinked > 0) {
+      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s)\n\nTodos esses dados também serão EXCLUÍDOS!\n\nDeseja continuar?`;
+    }
+    
+    if (!confirm(confirmMessage)) return;
 
     try {
+      // Excluir dados vinculados
+      for (const studentDoc of studentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'students', studentDoc.id));
+      }
+      for (const lessonDoc of lessonsSnapshot.docs) {
+        await deleteDoc(doc(db, 'lessons', lessonDoc.id));
+      }
+      for (const paymentDoc of paymentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'payments', paymentDoc.id));
+      }
+      
+      // Excluir o professor
       await deleteDoc(doc(db, 'users', id));
-      toast({ title: 'Professor excluído!' });
+      
+      toast({ 
+        title: 'Professor excluído!', 
+        description: totalLinked > 0 ? `${totalLinked} registro(s) vinculados também foram removidos` : undefined
+      });
       fetchData();
     } catch (error) {
       toast({

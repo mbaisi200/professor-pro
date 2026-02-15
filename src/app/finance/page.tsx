@@ -52,12 +52,14 @@ interface Payment {
   dueDate: string | null;
   status: string;
   referenceMonth: string | null;
+  teacherId?: string | null;
 }
 
 interface Student {
   id: string;
   name: string;
   status: string;
+  teacherId?: string | null;
 }
 
 // Payment Form Modal
@@ -275,7 +277,7 @@ export default function FinancePage() {
     } else if (user) {
       fetchData();
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, userData]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -284,8 +286,15 @@ export default function FinancePage() {
         firestoreService.getAll<Payment>(COLLECTIONS.PAYMENTS),
         firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
       ]);
-      setPayments(paymentsData);
-      setStudents(studentsData);
+      
+      // Se não for admin, filtrar apenas os dados do professor logado
+      if (userData?.role !== 'admin') {
+        setPayments(paymentsData.filter(p => p.teacherId === user?.uid));
+        setStudents(studentsData.filter(s => s.teacherId === user?.uid));
+      } else {
+        setPayments(paymentsData);
+        setStudents(studentsData);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

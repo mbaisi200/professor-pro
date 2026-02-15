@@ -40,6 +40,7 @@ interface Lesson {
   contentCovered: string | null;
   status: string;
   endOfCycle: boolean;
+  teacherId?: string | null;
 }
 
 interface Student {
@@ -47,6 +48,7 @@ interface Student {
   name: string;
   subject: string | null;
   status: string;
+  teacherId?: string | null;
 }
 
 // Lesson Form Modal
@@ -249,7 +251,7 @@ export default function LessonsPage() {
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const { user, loading } = useAuth();
+  const { user, loading, userData } = useAuth();
   const router = useRouter();
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -267,7 +269,7 @@ export default function LessonsPage() {
     } else if (user) {
       fetchData();
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, userData]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -276,8 +278,15 @@ export default function LessonsPage() {
         firestoreService.getAll<Lesson>(COLLECTIONS.LESSONS),
         firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
       ]);
-      setLessons(lessonsData);
-      setStudents(studentsData);
+      
+      // Se não for admin, filtrar apenas os dados do professor logado
+      if (userData?.role !== 'admin') {
+        setLessons(lessonsData.filter(l => l.teacherId === user?.uid));
+        setStudents(studentsData.filter(s => s.teacherId === user?.uid));
+      } else {
+        setLessons(lessonsData);
+        setStudents(studentsData);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
