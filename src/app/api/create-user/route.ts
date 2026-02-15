@@ -7,19 +7,40 @@ import { getFirestore } from 'firebase-admin/firestore';
 function getFirebaseAdminApp() {
   if (getApps().length === 0) {
     // Use environment variables for Firebase Admin SDK
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    
+    // Handle different formats of the private key
+    // If it contains literal \n, replace with actual newlines
+    if (privateKey.includes('\\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    }
+    
+    // Ensure the key has the proper format
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
+    }
     
     if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+      console.error('Missing Firebase Admin SDK credentials:', {
+        hasPrivateKey: !!privateKey,
+        hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+        hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      });
       throw new Error('Firebase Admin SDK credentials not configured');
     }
 
-    initializeApp({
-      credential: cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
-      }),
-    });
+    try {
+      initializeApp({
+        credential: cert({
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+    } catch (initError: any) {
+      console.error('Error initializing Firebase Admin:', initError);
+      throw initError;
+    }
   }
   return getApps()[0];
 }
