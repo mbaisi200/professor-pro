@@ -1456,11 +1456,19 @@ export default function AdminPage() {
     const lessonsSnapshot = await getDocs(query(collection(db, 'lessons'), where('teacherId', '==', id)));
     const paymentsSnapshot = await getDocs(query(collection(db, 'payments'), where('teacherId', '==', id)));
     
+    // Buscar o teacher para pegar o uid (se tiver acesso auth)
+    const teacherToDelete = teachers.find(t => t.id === id);
+    const hasAuthAccess = teacherToDelete?.uid || teacherToDelete?.hasAuth;
+    
     const totalLinked = studentsSnapshot.size + lessonsSnapshot.size + paymentsSnapshot.size;
     
     let confirmMessage = 'Deseja realmente excluir este professor?';
-    if (totalLinked > 0) {
+    if (totalLinked > 0 && hasAuthAccess) {
+      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s)\n- Acesso ao sistema (login)\n\nTodos esses dados também serão EXCLUÍDOS e ele PERDERÁ O ACESSO!\n\nDeseja continuar?`;
+    } else if (totalLinked > 0) {
       confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s)\n\nTodos esses dados também serão EXCLUÍDOS!\n\nDeseja continuar?`;
+    } else if (hasAuthAccess) {
+      confirmMessage = 'Este professor possui ACESSO AO SISTEMA.\n\nAo excluir, ele PERDERÁ o acesso!\n\nDeseja continuar?';
     }
     
     if (!confirm(confirmMessage)) return;
@@ -1477,7 +1485,21 @@ export default function AdminPage() {
         await deleteDoc(doc(db, 'payments', paymentDoc.id));
       }
       
-      // Excluir o professor
+      // Excluir do Firebase Auth se tiver uid
+      if (teacherToDelete?.uid) {
+        try {
+          await fetch('/api/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: teacherToDelete.uid }),
+          });
+        } catch (authError) {
+          console.error('Error deleting from Firebase Auth:', authError);
+          // Continua mesmo se falhar a exclusão do Auth
+        }
+      }
+      
+      // Excluir o professor do Firestore
       await deleteDoc(doc(db, 'users', id));
       
       toast({ 
