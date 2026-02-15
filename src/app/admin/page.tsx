@@ -1011,6 +1011,8 @@ export default function AdminPage() {
   const [importResults, setImportResults] = useState<any>(null);
   const [assignTeacherId, setAssignTeacherId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [linkToTeacher, setLinkToTeacher] = useState(false);
+  const [linkTeacherId, setLinkTeacherId] = useState<string>('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isSettingPassword, setIsSettingPassword] = useState(false);
@@ -1092,6 +1094,16 @@ export default function AdminPage() {
       return;
     }
 
+    // Se optou por vincular a um professor, precisa selecionar um
+    if (linkToTeacher && !linkTeacherId) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione um professor para vincular os dados',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsImporting(true);
     setImportResults(null);
 
@@ -1122,61 +1134,67 @@ export default function AdminPage() {
         (await getDocs(collection(db, 'students'))).docs.map(d => d.data().name?.toUpperCase()).filter(Boolean)
       );
 
-      // 1. Importar Usuários
-      if (data.usuarios && data.usuarios.length > 0) {
-        for (const usuario of data.usuarios) {
-          try {
-            const emailLower = usuario.email?.toLowerCase();
-            if (existingEmails.has(emailLower)) {
-              results.errors.push(`Usuário ${usuario.email}: já existe`);
-              continue;
+      // Se está vinculando a um professor específico, pular criação de usuários
+      if (!linkToTeacher) {
+        // 1. Importar Usuários (apenas se não estiver vinculando a professor específico)
+        if (data.usuarios && data.usuarios.length > 0) {
+          for (const usuario of data.usuarios) {
+            try {
+              const emailLower = usuario.email?.toLowerCase();
+              if (existingEmails.has(emailLower)) {
+                results.errors.push(`Usuário ${usuario.email}: já existe`);
+                continue;
+              }
+              const newId = doc(collection(db, 'users')).id;
+              await setDoc(doc(db, 'users', newId), {
+                name: usuario.nome?.toUpperCase() || 'SEM NOME',
+                email: emailLower,
+                role: usuario.tipo === 'admin' ? 'admin' : 'teacher',
+                status: 'active',
+                isExempt: true,
+                createdAt: usuario.data_cadastro ? new Date(usuario.data_cadastro) : serverTimestamp(),
+                importedFrom: 'base44',
+              });
+              results.usuarios++;
+            } catch (error: any) {
+              results.errors.push(`Usuário ${usuario.email}: ${error.message}`);
             }
-            const newId = doc(collection(db, 'users')).id;
-            await setDoc(doc(db, 'users', newId), {
-              name: usuario.nome?.toUpperCase() || 'SEM NOME',
-              email: emailLower,
-              role: usuario.tipo === 'admin' ? 'admin' : 'teacher',
-              status: 'active',
-              isExempt: true,
-              createdAt: usuario.data_cadastro ? new Date(usuario.data_cadastro) : serverTimestamp(),
-              importedFrom: 'base44',
-            });
-            results.usuarios++;
-          } catch (error: any) {
-            results.errors.push(`Usuário ${usuario.email}: ${error.message}`);
+          }
+        }
+
+        // 2. Importar Professores
+        if (data.professores && data.professores.length > 0) {
+          for (const professor of data.professores) {
+            try {
+              const emailLower = professor.email?.toLowerCase();
+              if (existingEmails.has(emailLower)) {
+                results.errors.push(`Professor ${professor.email}: já existe`);
+                continue;
+              }
+              const newId = doc(collection(db, 'users')).id;
+              idMapping.professores[emailLower] = newId;
+              idMapping.professores[professor.nome?.toUpperCase()] = newId;
+              await setDoc(doc(db, 'users', newId), {
+                name: professor.nome?.toUpperCase() || 'SEM NOME',
+                email: emailLower,
+                phone: professor.telefone || null,
+                role: 'teacher',
+                status: professor.status || 'active',
+                isExempt: professor.mensalidade === 0,
+                notes: professor.observacoes || null,
+                createdAt: professor.data_cadastro ? new Date(professor.data_cadastro) : serverTimestamp(),
+                importedFrom: 'base44',
+              });
+              results.professores++;
+            } catch (error: any) {
+              results.errors.push(`Professor ${professor.nome}: ${error.message}`);
+            }
           }
         }
       }
 
-      // 2. Importar Professores
-      if (data.professores && data.professores.length > 0) {
-        for (const professor of data.professores) {
-          try {
-            const emailLower = professor.email?.toLowerCase();
-            if (existingEmails.has(emailLower)) {
-              results.errors.push(`Professor ${professor.email}: já existe`);
-              continue;
-            }
-            const newId = doc(collection(db, 'users')).id;
-            idMapping.professores[emailLower] = newId;
-            idMapping.professores[professor.nome?.toUpperCase()] = newId;
-            await setDoc(doc(db, 'users', newId), {
-              name: professor.nome?.toUpperCase() || 'SEM NOME',
-              email: emailLower,
-              phone: professor.telefone || null,
-              role: 'teacher',
-              status: professor.status || 'active',
-              isExempt: professor.mensalidade === 0,
-              notes: professor.observacoes || null,
-              createdAt: professor.data_cadastro ? new Date(professor.data_cadastro) : serverTimestamp(),
-              importedFrom: 'base44',
-            });
-            results.professores++;
-          } catch (error: any) {
-            results.errors.push(`Professor ${professor.nome}: ${error.message}`);
-          }
-        }
-      }
+      // ID do professor para vincular (se selecionado)
+      const teacherIdToLink = linkToTeacher ? linkTeacherId : null;
 
       // 3. Importar Alunos
       if (data.alunos && data.alunos.length > 0) {
@@ -1205,7 +1223,7 @@ export default function AdminPage() {
               completedLessonsInCycle: 0,
               notes: aluno.observacoes || null,
               startDate: aluno.data_inicio || null,
-              teacherId: null,
+              teacherId: teacherIdToLink,
               chargeFee: true,
               createdAt: aluno.data_cadastro ? new Date(aluno.data_cadastro) : serverTimestamp(),
               importedFrom: 'base44',
@@ -1235,7 +1253,7 @@ export default function AdminPage() {
               attendance: aula.presenca === 'present' ? 'present' : aula.presenca === 'absent' ? 'absent' : null,
               endOfCycle: aula.fim_de_ciclo || false,
               notes: aula.observacoes || null,
-              teacherId: null,
+              teacherId: teacherIdToLink,
               createdAt: aula.data_cadastro ? new Date(aula.data_cadastro) : serverTimestamp(),
               importedFrom: 'base44',
             });
@@ -1261,6 +1279,7 @@ export default function AdminPage() {
               status: pagamento.status === 'paid' ? 'paid' : pagamento.status || 'pending',
               referenceMonth: pagamento.mes_referencia || null,
               notes: pagamento.observacoes || null,
+              teacherId: teacherIdToLink,
               createdAt: pagamento.data_cadastro ? new Date(pagamento.data_cadastro) : serverTimestamp(),
               importedFrom: 'base44',
             });
@@ -1814,6 +1833,53 @@ export default function AdminPage() {
                       : 'bg-slate-50 border-slate-200 placeholder:text-slate-400'
                   }`}
                 />
+              </div>
+
+              {/* Opção para vincular a um professor específico */}
+              <div className={`p-4 rounded-xl mb-4 ${darkMode ? 'bg-blue-900/20 border border-blue-700/50' : 'bg-blue-50 border border-blue-200'}`}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={linkToTeacher}
+                    onChange={(e) => setLinkToTeacher(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 text-blue-600 rounded"
+                  />
+                  <div>
+                    <span className={`font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                      Vincular dados a um professor específico
+                    </span>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                      Os dados serão importados apenas para Alunos, Aulas e Pagamentos, vinculados ao professor selecionado. Não serão criados novos usuários.
+                    </p>
+                  </div>
+                </label>
+                
+                {linkToTeacher && (
+                  <div className="mt-4">
+                    <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Selecione o Professor *
+                    </label>
+                    <select
+                      value={linkTeacherId}
+                      onChange={(e) => setLinkTeacherId(e.target.value)}
+                      className={`w-full mt-2 px-4 py-2 rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-700 border-slate-600 text-white'
+                          : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <option value="">Selecione um professor...</option>
+                      {teachers
+                        .filter(t => t.role === 'teacher' || t.role === 'admin')
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                        .map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name} ({teacher.email}) {teacher.role === 'admin' ? '- ADMIN' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">
