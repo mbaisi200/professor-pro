@@ -724,6 +724,185 @@ function SetPasswordModal({
   );
 }
 
+// Clear Payments Modal
+function ClearPaymentsModal({
+  teachers,
+  payments,
+  clearFilter,
+  setClearFilter,
+  clearTeacherId,
+  setClearTeacherId,
+  onConfirm,
+  onCancel,
+  isLoading,
+  darkMode,
+}: {
+  teachers: Teacher[];
+  payments: TeacherPayment[];
+  clearFilter: 'all' | 'admin' | 'teacher';
+  setClearFilter: (value: 'all' | 'admin' | 'teacher') => void;
+  clearTeacherId: string;
+  setClearTeacherId: (value: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+  darkMode: boolean;
+}) {
+  // Calculate how many payments will be deleted
+  const getPaymentCount = () => {
+    if (clearFilter === 'all') {
+      return payments.length;
+    } else if (clearFilter === 'admin') {
+      const adminIds = teachers.filter(t => t.role === 'admin').map(t => t.id);
+      return payments.filter(p => adminIds.includes(p.teacherId || '')).length;
+    } else if (clearFilter === 'teacher' && clearTeacherId) {
+      return payments.filter(p => p.teacherId === clearTeacherId).length;
+    }
+    return 0;
+  };
+
+  const paymentCount = getPaymentCount();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className={`rounded-2xl w-full max-w-md p-6 ${
+          darkMode ? 'bg-slate-800' : 'bg-white'
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`p-3 rounded-xl ${darkMode ? 'bg-red-900/30' : 'bg-red-100'}`}>
+            <Trash2 className={`w-6 h-6 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
+          </div>
+          <div>
+            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+              Limpar Lançamentos
+            </h2>
+            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Selecione quais lançamentos deseja excluir
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Filter Options */}
+          <div className={`p-4 rounded-xl space-y-3 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="clearFilter"
+                value="all"
+                checked={clearFilter === 'all'}
+                onChange={() => setClearFilter('all')}
+                className="w-4 h-4 text-red-600"
+              />
+              <div>
+                <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  Todos os lançamentos
+                </span>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Excluir todos os {payments.length} registros
+                </p>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="clearFilter"
+                value="admin"
+                checked={clearFilter === 'admin'}
+                onChange={() => setClearFilter('admin')}
+                className="w-4 h-4 text-red-600"
+              />
+              <div>
+                <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  Apenas de Administradores
+                </span>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {payments.filter(p => teachers.filter(t => t.role === 'admin').map(t => t.id).includes(p.teacherId || '')).length} registros
+                </p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="clearFilter"
+                value="teacher"
+                checked={clearFilter === 'teacher'}
+                onChange={() => setClearFilter('teacher')}
+                className="w-4 h-4 text-red-600 mt-1"
+              />
+              <div className="flex-1">
+                <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  De um professor específico
+                </span>
+                {clearFilter === 'teacher' && (
+                  <select
+                    value={clearTeacherId}
+                    onChange={(e) => setClearTeacherId(e.target.value)}
+                    className={`w-full mt-2 px-3 py-2 rounded-lg border text-sm ${
+                      darkMode
+                        ? 'bg-slate-600 border-slate-500 text-white'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <option value="">Selecione um professor...</option>
+                    {teachers
+                      .filter(t => t.role === 'teacher')
+                      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                      .map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.name} ({payments.filter(p => p.teacherId === teacher.id).length} registros)
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </div>
+            </label>
+          </div>
+
+          {/* Warning */}
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-red-900/30 border border-red-700/50' : 'bg-red-50 border border-red-200'}`}>
+            <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+              ⚠️ <strong>{paymentCount} registro(s)</strong> serão excluídos permanentemente!
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={onConfirm}
+              disabled={isLoading || paymentCount === 0 || (clearFilter === 'teacher' && !clearTeacherId)}
+              className="flex-1 bg-red-600 hover:bg-red-700"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Excluindo...
+                </>
+              ) : (
+                `Excluir ${paymentCount} registro(s)`
+              )}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // Stats Card
 function StatsCard({
   title,
@@ -835,6 +1014,9 @@ export default function AdminPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [showClearPaymentsModal, setShowClearPaymentsModal] = useState(false);
+  const [clearFilter, setClearFilter] = useState<'all' | 'admin' | 'teacher'>('all');
+  const [clearTeacherId, setClearTeacherId] = useState<string>('');
   const { toast } = useToast();
 
   const { user, userData, loading } = useAuth();
@@ -1326,15 +1508,41 @@ export default function AdminPage() {
 
   // Clear all teacher payments (admin only)
   const handleClearAllPayments = async () => {
-    if (!confirm('ATENÇÃO!\n\nDeseja realmente excluir TODOS os lançamentos de mensalidades?\n\nEsta ação não pode ser desfeita!')) return;
+    // Determine which payments to delete based on filter
+    let paymentsToDelete: TeacherPayment[] = [];
+    let filterDescription = '';
+    
+    if (clearFilter === 'all') {
+      paymentsToDelete = payments;
+      filterDescription = 'TODOS os lançamentos';
+    } else if (clearFilter === 'admin') {
+      // Get admin IDs
+      const adminIds = teachers.filter(t => t.role === 'admin').map(t => t.id);
+      paymentsToDelete = payments.filter(p => adminIds.includes(p.teacherId || ''));
+      filterDescription = 'lançamentos de ADMINISTRADORES';
+    } else if (clearFilter === 'teacher' && clearTeacherId) {
+      paymentsToDelete = payments.filter(p => p.teacherId === clearTeacherId);
+      const teacher = teachers.find(t => t.id === clearTeacherId);
+      filterDescription = `lançamentos de ${teacher?.name || 'professor selecionado'}`;
+    }
+    
+    if (paymentsToDelete.length === 0) {
+      toast({ 
+        title: 'Nenhum lançamento encontrado', 
+        description: 'Não há lançamentos para o filtro selecionado',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (!confirm(`ATENÇÃO!\n\nDeseja realmente excluir ${filterDescription}?\n\nTotal: ${paymentsToDelete.length} registro(s)\n\nEsta ação não pode ser desfeita!`)) return;
     
     setIsSaving(true);
     try {
-      const paymentsSnapshot = await getDocs(collection(db, 'teacherPayments'));
       let deletedCount = 0;
       
-      for (const paymentDoc of paymentsSnapshot.docs) {
-        await deleteDoc(doc(db, 'teacherPayments', paymentDoc.id));
+      for (const payment of paymentsToDelete) {
+        await deleteDoc(doc(db, 'teacherPayments', payment.id));
         deletedCount++;
       }
       
@@ -1342,6 +1550,9 @@ export default function AdminPage() {
         title: 'Lançamentos excluídos!', 
         description: `${deletedCount} registros removidos` 
       });
+      setShowClearPaymentsModal(false);
+      setClearFilter('all');
+      setClearTeacherId('');
       fetchData();
     } catch (error) {
       toast({ 
@@ -2137,8 +2348,7 @@ export default function AdminPage() {
                   {payments.length > 0 && (
                     <Button
                       variant="outline"
-                      onClick={handleClearAllPayments}
-                      disabled={isSaving}
+                      onClick={() => setShowClearPaymentsModal(true)}
                       className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                     >
                       <Trash2 className="w-4 h-4 mr-2" /> Limpar Tudo
@@ -2313,6 +2523,24 @@ export default function AdminPage() {
                 setSelectedTeacher(null);
               }}
               isLoading={isSettingPassword}
+              darkMode={darkMode}
+            />
+          )}
+          {showClearPaymentsModal && (
+            <ClearPaymentsModal
+              teachers={teachers}
+              payments={payments}
+              clearFilter={clearFilter}
+              setClearFilter={setClearFilter}
+              clearTeacherId={clearTeacherId}
+              setClearTeacherId={setClearTeacherId}
+              onConfirm={handleClearAllPayments}
+              onCancel={() => {
+                setShowClearPaymentsModal(false);
+                setClearFilter('all');
+                setClearTeacherId('');
+              }}
+              isLoading={isSaving}
               darkMode={darkMode}
             />
           )}
