@@ -15,6 +15,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { isBefore, parseISO } from 'date-fns';
+import { refreshAllCyclesForTeacher } from '@/lib/firestore';
 
 interface UserData {
   id: string; // Document ID in Firestore
@@ -89,6 +90,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log('userData definido:', data);
               setUserData(data);
               userCache = { uid: firebaseUser.uid, data };
+              
+              // Fazer refresh dos ciclos de aulas ao logar
+              console.log('=== Iniciando refresh de ciclos ===');
+              refreshAllCyclesForTeacher(docId).catch(err => {
+                console.error('Erro ao atualizar ciclos:', err);
+              });
             } else {
               // Se não encontrou pelo ID, buscar pelo campo 'uid'
               console.log('Não encontrado pelo ID, buscando pelo campo uid...');
@@ -105,6 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log('userData definido:', data);
                 setUserData(data);
                 userCache = { uid: firebaseUser.uid, data };
+                
+                // Fazer refresh dos ciclos de aulas ao logar
+                console.log('=== Iniciando refresh de ciclos ===');
+                refreshAllCyclesForTeacher(docId).catch(err => {
+                  console.error('Erro ao atualizar ciclos:', err);
+                });
               } else {
                 console.log('Usuário não encontrado, criando documento básico');
                 // Se não existir, criar documento básico

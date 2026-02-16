@@ -596,3 +596,25 @@ export function filterRegularLessons(lessons: Lesson[]): Lesson[] {
 export function getCycleMarkers(lessons: Lesson[]): Lesson[] {
   return lessons.filter(lesson => lesson.endOfCycle === true);
 }
+
+/**
+ * Refresh global: Recalcula ciclos de TODOS os alunos de um professor
+ * Deve ser chamado ao fazer login no sistema
+ */
+export async function refreshAllCyclesForTeacher(teacherId: string): Promise<void> {
+  console.log('=== Refreshing cycles for teacher:', teacherId);
+  
+  // Buscar todos os alunos do professor
+  const students = await getStudents(teacherId);
+  console.log('Students found:', students.length);
+  
+  for (const student of students) {
+    // Só processar alunos com aulas contratadas definidas
+    if (student.contractedLessons && student.contractedLessons > 0) {
+      console.log(`Processing student: ${student.name} (${student.contractedLessons} contracted lessons)`);
+      await recalculateAllCycles(student.id!, teacherId);
+    }
+  }
+  
+  console.log('=== Cycle refresh complete ===');
+}
