@@ -17,6 +17,11 @@ import {
   BookOpen,
   Check,
   Flag,
+  FileText,
+  Download,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   format,
@@ -422,6 +427,14 @@ export default function LessonsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Estados de Relatório
+  const [showReport, setShowReport] = useState(false);
+  const [reportStudent, setReportStudent] = useState<string>('all');
+  const [reportPeriod, setReportPeriod] = useState<string>('all');
+  const [sortField, setSortField] = useState<string>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -576,6 +589,262 @@ export default function LessonsPage() {
     }
   };
 
+  // ============ FUNÇÕES DE RELATÓRIO ============
+  
+  // Funções de Ordenação
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 opacity-40" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1 text-blue-500" />
+      : <ArrowDown className="w-4 h-4 ml-1 text-blue-500" />;
+  };
+
+  // Filtrar aulas para relatório
+  const getFilteredLessonsForReport = () => {
+    let filtered = [...lessons];
+    
+    // Filtrar por aluno
+    if (reportStudent !== 'all') {
+      filtered = filtered.filter(l => l.studentId === reportStudent);
+    }
+    
+    // Filtrar por período
+    if (reportPeriod !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date;
+      
+      switch (reportPeriod) {
+        case 'current_month':
+          startDate = startOfMonth(now);
+          endDate = endOfMonth(now);
+          break;
+        case 'last_month':
+          startDate = startOfMonth(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+          endDate = endOfMonth(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+          break;
+        case 'last_3_months':
+          startDate = startOfMonth(new Date(now.getFullYear(), now.getMonth() - 2, 1));
+          endDate = endOfMonth(now);
+          break;
+        case 'current_year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        default:
+          startDate = startOfMonth(now);
+          endDate = endOfMonth(now);
+      }
+      
+      filtered = filtered.filter(l => {
+        const lessonDate = parseISO(l.date);
+        return lessonDate >= startDate && lessonDate <= endDate;
+      });
+    }
+    
+    // Ordenar pelo campo selecionado
+    return filtered.sort((a, b) => {
+      let valueA: string | number;
+      let valueB: string | number;
+
+      switch (sortField) {
+        case 'date':
+          valueA = new Date(a.date).getTime();
+          valueB = new Date(b.date).getTime();
+          break;
+        case 'startTime':
+          valueA = a.startTime || '';
+          valueB = b.startTime || '';
+          break;
+        case 'studentName':
+          valueA = (a.studentName || '').toLowerCase();
+          valueB = (b.studentName || '').toLowerCase();
+          break;
+        case 'subject':
+          valueA = (a.subject || '').toLowerCase();
+          valueB = (b.subject || '').toLowerCase();
+          break;
+        case 'status':
+          valueA = a.status;
+          valueB = b.status;
+          break;
+        default:
+          valueA = new Date(a.date).getTime();
+          valueB = new Date(b.date).getTime();
+      }
+
+      if (valueA < valueB) return sortDirection === 'asc' ? -1 : 1;
+      if (valueA > valueB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Exportar PDF
+  const handleExportPDF = () => {
+    const reportData = getFilteredLessonsForReport();
+    const studentName = reportStudent === 'all' 
+      ? 'Todos os Alunos' 
+      : students.find(s => s.id === reportStudent)?.name || 'Aluno';
+    
+    const periodLabel: Record<string, string> = {
+      'all': 'Todo Período',
+      'current_month': format(new Date(), "MMMM 'de' yyyy", { locale: ptBR }),
+      'last_month': format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), "MMMM 'de' yyyy", { locale: ptBR }),
+      'last_3_months': 'Últimos 3 meses',
+      'current_year': `Ano de ${new Date().getFullYear()}`,
+    };
+
+    // Criar HTML para impressão
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Erro', description: 'Popup bloqueado. Permita popups para exportar.', variant: 'destructive' });
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Relatório de Aulas - ProClass</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; }
+          .header h1 { font-size: 24px; color: #1e293b; margin-bottom: 5px; }
+          .header p { color: #64748b; font-size: 14px; }
+          .info { display: flex; justify-content: space-between; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 8px; }
+          .info-item { text-align: center; }
+          .info-item label { display: block; font-size: 12px; color: #64748b; margin-bottom: 4px; }
+          .info-item span { font-weight: bold; color: #1e293b; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #3b82f6; color: white; padding: 12px 8px; text-align: left; font-size: 12px; }
+          td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .status-completed { color: #059669; font-weight: bold; }
+          .status-scheduled { color: #2563eb; font-weight: bold; }
+          .status-cancelled { color: #dc2626; font-weight: bold; }
+          .status-rescheduled { color: #d97706; font-weight: bold; }
+          .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>📋 Relatório de Aulas</h1>
+          <p>ProClass - Sistema de Gestão de Aulas</p>
+        </div>
+        
+        <div class="info">
+          <div class="info-item">
+            <label>Aluno</label>
+            <span>${studentName}</span>
+          </div>
+          <div class="info-item">
+            <label>Período</label>
+            <span>${periodLabel[reportPeriod] || reportPeriod}</span>
+          </div>
+          <div class="info-item">
+            <label>Total de Aulas</label>
+            <span>${reportData.length}</span>
+          </div>
+          <div class="info-item">
+            <label>Concluídas</label>
+            <span>${reportData.filter(l => l.status === 'completed').length}</span>
+          </div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Horário</th>
+              <th>Aluno</th>
+              <th>Matéria</th>
+              <th>Status</th>
+              <th>Conteúdo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${reportData.map(lesson => `
+              <tr>
+                <td>${format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                <td>${lesson.startTime || '--:--'}</td>
+                <td>${lesson.studentName || '-'}</td>
+                <td>${lesson.subject || '-'}</td>
+                <td class="status-${lesson.status}">${lesson.endOfCycle ? '🎯 FIM DO CICLO' : statusLabels[lesson.status]}</td>
+                <td>${lesson.contentCovered || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          <p>Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  // Exportar Excel (CSV)
+  const handleExportExcel = () => {
+    const reportData = getFilteredLessonsForReport();
+    
+    // Criar CSV para Excel
+    const headers = ['Data', 'Horário', 'Aluno', 'Matéria', 'Status', 'Conteúdo'];
+    const rows = reportData.map(lesson => [
+      format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR }),
+      lesson.startTime || '--:--',
+      lesson.studentName || '-',
+      lesson.subject || '-',
+      lesson.endOfCycle ? 'FIM DO CICLO' : statusLabels[lesson.status],
+      lesson.contentCovered || '-'
+    ]);
+
+    // Montar CSV
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+
+    // Adicionar BOM para UTF-8
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_aulas_${format(new Date(), 'dd-MM-yyyy')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: 'Excel exportado com sucesso!' });
+  };
+
   // Calendar logic
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -640,17 +909,228 @@ export default function LessonsPage() {
                 {lessons.length} aulas agendadas
               </p>
             </div>
-            <Button
-              onClick={() => {
-                setSelectedDate(new Date());
-                setEditingLesson(null);
-                setShowForm(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Nova Aula
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowReport(!showReport)}
+                className={showReport ? 'bg-amber-100 text-amber-700 border-amber-300' : (darkMode ? 'border-slate-600 text-white' : '')}
+              >
+                <FileText className="w-4 h-4 mr-2" /> Relatórios
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setEditingLesson(null);
+                  setShowForm(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Nova Aula
+              </Button>
+            </div>
           </motion.div>
+
+          {/* Report Panel */}
+          <AnimatePresence>
+            {showReport && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className={`mb-6 rounded-2xl shadow-lg overflow-hidden ${
+                  darkMode ? 'bg-slate-800' : 'bg-white'
+                }`}
+              >
+                <div className="p-5">
+                  <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Filtros do Relatório
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Filtro Aluno */}
+                    <div>
+                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Aluno
+                      </label>
+                      <select
+                        value={reportStudent}
+                        onChange={(e) => setReportStudent(e.target.value)}
+                        className={`w-full mt-1 px-3 py-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <option value="all">Todos os Alunos</option>
+                        {students
+                          .filter(s => s.status === 'active')
+                          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                          .map(student => (
+                            <option key={student.id} value={student.id}>
+                              {student.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro Período */}
+                    <div>
+                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Período
+                      </label>
+                      <select
+                        value={reportPeriod}
+                        onChange={(e) => setReportPeriod(e.target.value)}
+                        className={`w-full mt-1 px-3 py-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <option value="all">Todo Período</option>
+                        <option value="current_month">Mês Atual</option>
+                        <option value="last_month">Mês Anterior</option>
+                        <option value="last_3_months">Últimos 3 Meses</option>
+                        <option value="current_year">Ano Atual</option>
+                      </select>
+                    </div>
+
+                    {/* Botões Exportar */}
+                    <div className="flex items-end gap-2">
+                      <Button
+                        onClick={handleExportPDF}
+                        className="flex-1 bg-red-600 hover:bg-red-700"
+                      >
+                        <Download className="w-4 h-4 mr-2" /> PDF
+                      </Button>
+                      <Button
+                        onClick={handleExportExcel}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        <Download className="w-4 h-4 mr-2" /> Excel
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Resumo */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+                    <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-blue-50'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-blue-700'}`}>
+                        {getFilteredLessonsForReport().length}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-blue-600'}`}>Total</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-green-50'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-green-700'}`}>
+                        {getFilteredLessonsForReport().filter(l => l.status === 'completed').length}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-green-600'}`}>Concluídas</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-blue-50'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-blue-700'}`}>
+                        {getFilteredLessonsForReport().filter(l => l.status === 'scheduled').length}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-blue-600'}`}>Agendadas</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-red-50'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-red-700'}`}>
+                        {getFilteredLessonsForReport().filter(l => l.status === 'cancelled').length}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-red-600'}`}>Canceladas</p>
+                    </div>
+                  </div>
+
+                  {/* Tabela de Aulas do Relatório */}
+                  {getFilteredLessonsForReport().length > 0 && (
+                    <div className={`mt-6 rounded-xl border overflow-hidden ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                      <div className="overflow-x-auto max-h-80">
+                        <table className="w-full">
+                          <thead className={darkMode ? 'bg-slate-700' : 'bg-slate-100'}>
+                            <tr>
+                              <th 
+                                onClick={() => handleSort('date')}
+                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                <div className="flex items-center">Data{getSortIcon('date')}</div>
+                              </th>
+                              <th 
+                                onClick={() => handleSort('startTime')}
+                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                <div className="flex items-center">Horário{getSortIcon('startTime')}</div>
+                              </th>
+                              <th 
+                                onClick={() => handleSort('studentName')}
+                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                <div className="flex items-center">Aluno{getSortIcon('studentName')}</div>
+                              </th>
+                              <th 
+                                onClick={() => handleSort('subject')}
+                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                <div className="flex items-center">Matéria{getSortIcon('subject')}</div>
+                              </th>
+                              <th 
+                                onClick={() => handleSort('status')}
+                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                <div className="flex items-center">Status{getSortIcon('status')}</div>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
+                            {getFilteredLessonsForReport().map((lesson) => (
+                              <tr 
+                                key={lesson.id}
+                                className={lesson.endOfCycle ? 'bg-amber-50 dark:bg-amber-900/20' : ''}
+                              >
+                                <td className={`py-2 px-4 text-sm ${lesson.endOfCycle ? 'text-amber-800 font-medium' : darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  {lesson.endOfCycle ? (
+                                    <span className="flex items-center gap-1">
+                                      <Flag className="w-3 h-3 text-amber-600" />
+                                      {format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                    </span>
+                                  ) : (
+                                    format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })
+                                  )}
+                                </td>
+                                <td className={`py-2 px-4 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  {lesson.startTime || '--:--'}
+                                </td>
+                                <td className={`py-2 px-4 text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {lesson.studentName || '-'}
+                                </td>
+                                <td className={`py-2 px-4 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {lesson.subject || '-'}
+                                </td>
+                                <td className="py-2 px-4">
+                                  {lesson.endOfCycle ? (
+                                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">
+                                      🎯 FIM DO CICLO
+                                    </span>
+                                  ) : (
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      lesson.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                      lesson.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                      lesson.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                      'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {statusLabels[lesson.status]}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Calendar */}
           <motion.div
