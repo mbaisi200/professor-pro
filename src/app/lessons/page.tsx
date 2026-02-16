@@ -67,12 +67,13 @@ interface Student {
   teacherId?: string | null;
 }
 
-// Status colors
+// Status colors - cores sólidas para o calendário
 const statusColors: Record<string, string> = {
   scheduled: 'bg-blue-500',
   completed: 'bg-emerald-500',
   cancelled: 'bg-rose-500',
   rescheduled: 'bg-amber-500',
+  cycle_end: 'bg-purple-500',
 };
 
 const statusLabels: Record<string, string> = {
@@ -80,6 +81,7 @@ const statusLabels: Record<string, string> = {
   completed: 'Concluída',
   cancelled: 'Cancelada',
   rescheduled: 'Remarcada',
+  cycle_end: 'Fim do Ciclo',
 };
 
 // Lesson Form Modal
@@ -877,22 +879,6 @@ export default function LessonsPage() {
     setShowForm(true);
   };
 
-  const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
-    completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
-    rescheduled: 'bg-amber-100 text-amber-700 border-amber-200',
-    cycle_end: 'bg-purple-100 text-purple-700 border-purple-200',
-  };
-
-  const statusLabels: Record<string, string> = {
-    scheduled: 'Agendada',
-    completed: 'Concluída',
-    cancelled: 'Cancelada',
-    rescheduled: 'Remarcada',
-    cycle_end: 'Fim do Ciclo',
-  };
-
   const handleLessonClick = (lesson: Lesson, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedLesson(lesson);
@@ -1250,7 +1236,7 @@ export default function LessonsPage() {
                           onClick={(e) => handleLessonClick(lesson, e)}
                           className={`text-xs p-1.5 rounded truncate cursor-pointer transition-all hover:scale-[1.02] ${
                             lesson.endOfCycle
-                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              ? 'bg-purple-500 text-white'
                               : `${statusColors[lesson.status]} text-white`
                           }`}
                         >
@@ -1301,7 +1287,7 @@ export default function LessonsPage() {
               <span className="text-sm">Remarcada</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-amber-200 border border-amber-300"></div>
+              <div className="w-3 h-3 rounded bg-purple-500"></div>
               <span className="text-sm">Fim do Ciclo</span>
             </div>
           </div>
