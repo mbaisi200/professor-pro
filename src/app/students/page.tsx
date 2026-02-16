@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -379,6 +380,7 @@ export default function StudentsPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { user, loading, userData } = useAuth();
   const router = useRouter();
@@ -441,6 +443,9 @@ export default function StudentsPage() {
         toast({ title: 'Aluno cadastrado!' });
       }
 
+      // Invalidar cache do React Query para atualizar o Dashboard
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      
       setShowForm(false);
       setEditingStudent(null);
       fetchStudents();
@@ -461,6 +466,10 @@ export default function StudentsPage() {
     try {
       await firestoreService.delete(COLLECTIONS.STUDENTS, id);
       toast({ title: 'Aluno excluído!' });
+      
+      // Invalidar cache do React Query para atualizar o Dashboard
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      
       fetchStudents();
     } catch (error) {
       toast({
