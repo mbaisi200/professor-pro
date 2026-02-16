@@ -12,12 +12,13 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { isBefore, parseISO } from 'date-fns';
 
 interface UserData {
-  uid: string;
+  id: string; // Document ID in Firestore
+  uid: string; // Firebase Auth UID
   email: string | null;
   name: string | null;
   role: 'admin' | 'teacher';
@@ -69,29 +70,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // Verificar cache primeiro
         if (userCache && userCache.uid === firebaseUser.uid) {
+          console.log('=== AUTH: Usando cache ===');
+          console.log('userCache.data:', userCache.data);
           setUserData(userCache.data);
         } else {
           // Buscar dados do usuário no Firestore
           try {
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            console.log('=== AUTH: Buscando no Firestore ===');
+            console.log('firebaseUser.uid:', firebaseUser.uid);
+            
+            // Primeiro, tentar buscar pelo ID do documento (Firebase Auth UID)
+            let userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            let docId = firebaseUser.uid;
+            
             if (userDoc.exists()) {
-              const data = { uid: firebaseUser.uid, ...userDoc.data() } as UserData;
+              console.log('Encontrado pelo ID do documento:', firebaseUser.uid);
+              const data = { id: docId, uid: firebaseUser.uid, ...userDoc.data() } as UserData;
+              console.log('userData definido:', data);
               setUserData(data);
               userCache = { uid: firebaseUser.uid, data };
             } else {
-              // Se não existir, criar documento básico
-              const basicData: UserData = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: firebaseUser.displayName,
-                role: 'teacher',
-              };
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
-                ...basicData,
-                createdAt: serverTimestamp(),
-              });
-              setUserData(basicData);
-              userCache = { uid: firebaseUser.uid, data: basicData };
+              // Se não encontrou pelo ID, buscar pelo campo 'uid'
+              console.log('Não encontrado pelo ID, buscando pelo campo uid...');
+              const usersRef = collection(db, 'users');
+              const q = query(usersRef, where('uid', '==', firebaseUser.uid));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                // Encontrou pelo campo uid
+                const doc = querySnapshot.docs[0];
+                docId = doc.id;
+                console.log('Encontrado pelo campo uid. docId:', docId);
+                const data = { id: docId, uid: firebaseUser.uid, ...doc.data() } as UserData;
+                console.log('userData definido:', data);
+                setUserData(data);
+                userCache = { uid: firebaseUser.uid, data };
+              } else {
+                console.log('Usuário não encontrado, criando documento básico');
+                // Se não existir, criar documento básico
+                const basicData: UserData = {
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName,
+                  role: 'teacher',
+                };
+                await setDoc(doc(db, 'users', firebaseUser.uid), {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName,
+                  role: 'teacher',
+                  createdAt: serverTimestamp(),
+                });
+                setUserData(basicData);
+                userCache = { uid: firebaseUser.uid, data: basicData };
+              }
             }
           } catch (error) {
             console.error('Error fetching user data:', error);

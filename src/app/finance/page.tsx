@@ -287,13 +287,14 @@ export default function FinancePage() {
         firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
       ]);
       
-      // Se não for admin, filtrar apenas os dados do professor logado
-      if (userData?.role !== 'admin') {
-        setPayments(paymentsData.filter(p => p.teacherId === user?.uid));
-        setStudents(studentsData.filter(s => s.teacherId === user?.uid));
+      // Cada usuário (admin ou professor) vê apenas seus próprios dados
+      // Usar userData.id (document ID) em vez de user?.uid (Firebase Auth UID)
+      if (userData?.id) {
+        setPayments(paymentsData.filter(p => p.teacherId === userData.id));
+        setStudents(studentsData.filter(s => s.teacherId === userData.id));
       } else {
-        setPayments(paymentsData);
-        setStudents(studentsData);
+        setPayments([]);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -306,14 +307,15 @@ export default function FinancePage() {
     setIsSaving(true);
     try {
       const paymentData = {
-        studentName: data.studentName || null,
+        studentName: data.studentName ? data.studentName.toUpperCase() : null,
         studentId: data.studentId || null,
         amount: parseFloat(data.amount),
         paymentDate: data.paymentDate || null,
         dueDate: data.dueDate || null,
         status: data.status,
         referenceMonth: data.referenceMonth || null,
-        teacherId: user?.uid || null,
+        // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
+        teacherId: userData?.id || null,
       };
 
       if (editingPayment) {

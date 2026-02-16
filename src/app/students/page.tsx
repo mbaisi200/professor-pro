@@ -336,11 +336,12 @@ export default function StudentsPage() {
     setIsLoading(true);
     try {
       const data = await firestoreService.getAll<Student>(COLLECTIONS.STUDENTS);
-      // Se não for admin, filtrar apenas os alunos do professor logado
-      if (userData?.role !== 'admin') {
-        setStudents(data.filter(s => s.teacherId === user?.uid));
+      // Cada usuário (admin ou professor) vê apenas seus próprios alunos
+      // Usar userData.id (document ID) em vez de user?.uid (Firebase Auth UID)
+      if (userData?.id) {
+        setStudents(data.filter(s => s.teacherId === userData.id));
       } else {
-        setStudents(data);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -353,13 +354,13 @@ export default function StudentsPage() {
     setIsSaving(true);
     try {
       const studentData = {
-        name: data.name,
-        email: data.email || null,
+        name: data.name ? data.name.toUpperCase() : null,
+        email: data.email ? data.email.toLowerCase() : null,
         phone: data.phone || null,
-        guardianName: data.guardianName || null,
+        guardianName: data.guardianName ? data.guardianName.toUpperCase() : null,
         guardianPhone: data.guardianPhone || null,
-        subject: data.subject || null,
-        turma: data.turma || null,
+        subject: data.subject ? data.subject.toUpperCase() : null,
+        turma: data.turma ? data.turma.toUpperCase() : null,
         monthlyFee: data.monthlyFee ? parseFloat(data.monthlyFee) : null,
         paymentDay: data.paymentDay ? parseInt(data.paymentDay) : null,
         chargeFee: data.chargeFee,
@@ -368,7 +369,8 @@ export default function StudentsPage() {
         completedLessonsInCycle: editingStudent?.completedLessonsInCycle || 0,
         startDate: data.startDate || null,
         notes: data.notes || null,
-        teacherId: user?.uid || null,
+        // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
+        teacherId: userData?.id || null,
       };
 
       if (editingStudent) {

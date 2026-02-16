@@ -97,18 +97,28 @@ export interface TeacherPayment {
 
 // ============== STUDENTS ==============
 export async function getStudents(teacherId?: string) {
+  console.log('=== getStudents chamado ===');
+  console.log('teacherId parametro:', teacherId);
+  
   const studentsRef = collection(db, 'students');
   const q = teacherId 
     ? query(studentsRef, where('teacherId', '==', teacherId))
     : studentsRef;
   
+  console.log('Query vai filtrar?', teacherId ? 'SIM' : 'NAO');
+  
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
+  const students = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate(),
     updatedAt: doc.data().updatedAt?.toDate(),
   })) as Student[];
+  
+  console.log('Alunos retornados:', students.length);
+  students.forEach(s => console.log(`- ${s.name}: teacherId=${s.teacherId}`));
+  
+  return students;
 }
 
 export async function getStudent(id: string) {

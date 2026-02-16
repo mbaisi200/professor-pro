@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -202,9 +203,32 @@ export default function Dashboard() {
     return false;
   });
 
-  const { user, loading: authLoading, isExpired } = useAuth();
-  const { students, lessons, payments, isLoading, isError, refetch } = useDashboardData();
+  const { user, userData, loading: authLoading, isExpired } = useAuth();
+  const queryClient = useQueryClient();
   const router = useRouter();
+  
+  // Calcular teacherId corretamente
+  // Cada usuário (admin ou professor) vê apenas seus próprios dados
+  const teacherId = useMemo(() => {
+    console.log('=== DEBUG DASHBOARD ===');
+    console.log('userData:', userData);
+    console.log('userData.id:', userData?.id);
+    console.log('userData.role:', userData?.role);
+    if (!userData) return null;
+    console.log('teacherId calculado:', userData.id);
+    return userData.id; // Cada um vê apenas seus dados
+  }, [userData]);
+  
+  // Limpar cache quando o usuário mudar para evitar dados de outras sessões
+  useEffect(() => {
+    if (userData?.id) {
+      queryClient.removeQueries({ queryKey: ['students'] });
+      queryClient.removeQueries({ queryKey: ['lessons'] });
+      queryClient.removeQueries({ queryKey: ['payments'] });
+    }
+  }, [userData?.id, queryClient]);
+  
+  const { students, lessons, payments, isLoading, isError, refetch } = useDashboardData(teacherId);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -217,6 +241,23 @@ export default function Dashboard() {
     return (
       <ExpirationModal darkMode={darkMode} />
     );
+  }
+
+  // Aguardar carregamento do auth
+  if (authLoading || !userData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-4 text-slate-600">Carregando dados do usuário...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tem usuário, não renderizar
+  if (!user) {
+    return null;
   }
 
   const monthStart = startOfMonth(parse(selectedMonth + '-01', 'yyyy-MM-dd', new Date()));
@@ -277,22 +318,6 @@ export default function Dashboard() {
       value: format(date, 'yyyy-MM'),
       label: format(date, "MMMM 'de' yyyy", { locale: ptBR }),
     });
-  }
-
-  // Loading state
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-slate-600">Verificando autenticação...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
   }
 
   // Show skeleton while loading data

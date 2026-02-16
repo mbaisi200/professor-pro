@@ -279,13 +279,14 @@ export default function LessonsPage() {
         firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
       ]);
       
-      // Se não for admin, filtrar apenas os dados do professor logado
-      if (userData?.role !== 'admin') {
-        setLessons(lessonsData.filter(l => l.teacherId === user?.uid));
-        setStudents(studentsData.filter(s => s.teacherId === user?.uid));
+      // Cada usuário (admin ou professor) vê apenas seus próprios dados
+      // Usar userData.id (document ID) em vez de user?.uid (Firebase Auth UID)
+      if (userData?.id) {
+        setLessons(lessonsData.filter(l => l.teacherId === userData.id));
+        setStudents(studentsData.filter(s => s.teacherId === userData.id));
       } else {
-        setLessons(lessonsData);
-        setStudents(studentsData);
+        setLessons([]);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -301,12 +302,13 @@ export default function LessonsPage() {
         date: data.date,
         startTime: data.startTime || null,
         studentId: data.studentId || null,
-        studentName: data.studentName || null,
-        subject: data.subject || null,
+        studentName: data.studentName ? data.studentName.toUpperCase() : null,
+        subject: data.subject ? data.subject.toUpperCase() : null,
         contentCovered: data.contentCovered || null,
         status: data.status,
         endOfCycle: false,
-        teacherId: user?.uid || null,
+        // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
+        teacherId: userData?.id || null,
       };
 
       if (editingLesson) {

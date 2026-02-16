@@ -22,10 +22,24 @@ import {
 } from '@/lib/firestore';
 
 // ============== STUDENTS ==============
-export function useStudents(teacherId?: string) {
+// teacherId === null: Ainda carregando, não fazer query (enabled: false)
+// teacherId === undefined: Admin, fazer query sem filtro (ver todos)
+// teacherId === string: Teacher, fazer query com filtro
+export function useStudents(teacherId?: string | null) {
+  console.log('=== DEBUG useStudents ===');
+  console.log('teacherId recebido:', teacherId);
   return useQuery({
     queryKey: ['students', teacherId],
-    queryFn: () => getStudents(teacherId),
+    queryFn: async () => {
+      console.log('Executando query com teacherId:', teacherId);
+      const result = await getStudents(teacherId === null ? undefined : teacherId ?? undefined);
+      console.log('Resultado getStudents:', result);
+      console.log('teacherId dos alunos:', result.map(s => ({ name: s.name, teacherId: s.teacherId })));
+      return result;
+    },
+    enabled: teacherId !== null, // Não executar se teacherId é null (carregando)
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -72,10 +86,13 @@ export function useTeachers() {
 }
 
 // ============== LESSONS ==============
-export function useLessons(teacherId?: string) {
+export function useLessons(teacherId?: string | null) {
   return useQuery({
     queryKey: ['lessons', teacherId],
-    queryFn: () => getLessons(teacherId),
+    queryFn: () => getLessons(teacherId === null ? undefined : teacherId ?? undefined),
+    enabled: teacherId !== null,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -114,10 +131,13 @@ export function useDeleteLesson() {
 }
 
 // ============== PAYMENTS ==============
-export function usePayments(teacherId?: string) {
+export function usePayments(teacherId?: string | null) {
   return useQuery({
     queryKey: ['payments', teacherId],
-    queryFn: () => getPayments(teacherId),
+    queryFn: () => getPayments(teacherId === null ? undefined : teacherId ?? undefined),
+    enabled: teacherId !== null,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -156,10 +176,13 @@ export function useDeletePayment() {
 }
 
 // ============== TEACHER PAYMENTS ==============
-export function useTeacherPayments(teacherId?: string) {
+export function useTeacherPayments(teacherId?: string | null) {
   return useQuery({
     queryKey: ['teacherPayments', teacherId],
-    queryFn: () => getTeacherPayments(teacherId),
+    queryFn: () => getTeacherPayments(teacherId === null ? undefined : teacherId ?? undefined),
+    enabled: teacherId !== null,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -198,7 +221,7 @@ export function useDeleteTeacherPayment() {
 }
 
 // ============== DASHBOARD DATA ==============
-export function useDashboardData(teacherId?: string) {
+export function useDashboardData(teacherId?: string | null) {
   const students = useStudents(teacherId);
   const lessons = useLessons(teacherId);
   const payments = usePayments(teacherId);
