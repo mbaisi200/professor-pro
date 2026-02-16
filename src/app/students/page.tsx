@@ -71,6 +71,24 @@ function StudentForm({
     notes: student?.notes || '',
   });
 
+  // Função para aplicar máscara de telefone brasileiro
+  const formatPhone = (value: string) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + número)
+    const limited = numbers.slice(0, 11);
+    
+    // Aplica a máscara
+    if (limited.length <= 2) {
+      return limited;
+    } else if (limited.length <= 7) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    } else {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(form);
@@ -137,8 +155,9 @@ function StudentForm({
               </label>
               <Input
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
                 placeholder="(00) 00000-0000"
+                maxLength={16}
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
@@ -162,8 +181,9 @@ function StudentForm({
               </label>
               <Input
                 value={form.guardianPhone}
-                onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })}
+                onChange={(e) => setForm({ ...form, guardianPhone: formatPhone(e.target.value) })}
                 placeholder="(00) 00000-0000"
+                maxLength={16}
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>

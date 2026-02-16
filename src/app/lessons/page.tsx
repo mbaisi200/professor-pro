@@ -311,7 +311,7 @@ export default function LessonsPage() {
         studentId: data.studentId || null,
         studentName: data.studentName ? data.studentName.toUpperCase() : null,
         subject: data.subject ? data.subject.toUpperCase() : null,
-        contentCovered: data.contentCovered || null,
+        contentCovered: data.contentCovered ? data.contentCovered.toUpperCase() : null,
         status: data.status,
         endOfCycle: false,
         // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
@@ -879,17 +879,17 @@ export default function LessonsPage() {
                                 transition={{ delay: index * 0.02 }}
                                 className={`${
                                   lesson.endOfCycle 
-                                    ? 'bg-amber-50 border-l-4 border-amber-400' 
+                                    ? 'bg-amber-100! border-l-4 border-amber-500 shadow-sm' 
                                     : darkMode 
                                       ? 'hover:bg-slate-700/50' 
                                       : 'hover:bg-slate-50'
                                 } transition-colors`}
                               >
-                                <td className={`py-3 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <td className={`py-3 px-4 ${lesson.endOfCycle ? 'text-amber-800 font-medium' : darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                   {lesson.endOfCycle ? (
                                     <div className="flex items-center gap-2">
-                                      <Flag className="w-4 h-4 text-amber-500" />
-                                      <span className="font-medium text-amber-700">
+                                      <Flag className="w-4 h-4 text-amber-600" />
+                                      <span>
                                         {format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })}
                                       </span>
                                     </div>
@@ -897,19 +897,19 @@ export default function LessonsPage() {
                                     format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })
                                   )}
                                 </td>
-                                <td className={`py-3 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <td className={`py-3 px-4 ${lesson.endOfCycle ? 'text-amber-800' : darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                   {lesson.startTime || '--:--'}
                                 </td>
-                                <td className={`py-3 px-4 font-medium ${lesson.endOfCycle ? 'text-amber-700' : darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                <td className={`py-3 px-4 font-medium ${lesson.endOfCycle ? 'text-amber-900' : darkMode ? 'text-white' : 'text-slate-800'}`}>
                                   {lesson.studentName || '-'}
                                 </td>
-                                <td className={`py-3 px-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <td className={`py-3 px-4 ${lesson.endOfCycle ? 'text-amber-800' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {lesson.subject || '-'}
                                 </td>
                                 <td className="py-3 px-4">
                                   {lesson.endOfCycle ? (
-                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                      🎯 Fim do Ciclo
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-white shadow-sm">
+                                      🎯 FIM DO CICLO
                                     </span>
                                   ) : (
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -1117,62 +1117,78 @@ export default function LessonsPage() {
                       dayLessons.map((lesson) => (
                         <div
                           key={lesson.id}
-                          className={`p-2 rounded-lg border text-xs ${statusColors[lesson.status]} relative group cursor-pointer hover:shadow-sm transition-shadow`}
+                          className={`p-2 rounded-lg border text-xs ${
+                            lesson.endOfCycle 
+                              ? 'bg-amber-100! border-amber-400 text-amber-800 border-l-4' 
+                              : statusColors[lesson.status]
+                          } relative group cursor-pointer hover:shadow-sm transition-shadow`}
                         >
-                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingLesson(lesson);
-                                setShowForm(true);
-                              }}
-                              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                              <Edit className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(lesson.id);
-                              }}
-                              className="p-1 bg-red-600 text-white rounded hover:bg-red-700"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
+                          {lesson.endOfCycle ? (
+                            <>
+                              <div className="flex items-center gap-1 mb-1 font-bold">
+                                <Flag className="w-3 h-3 text-amber-600" />
+                                <span className="text-amber-700">🎯 FIM DO CICLO</span>
+                              </div>
+                              <p className="font-medium truncate text-amber-800">{lesson.studentName || 'Aluno'}</p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingLesson(lesson);
+                                    setShowForm(true);
+                                  }}
+                                  className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(lesson.id);
+                                  }}
+                                  className="p-1 bg-red-600 text-white rounded hover:bg-red-700"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
 
-                          <div className="flex items-center gap-1 mb-1">
-                            <Clock className="w-3 h-3" />
-                            <span className="font-semibold">{lesson.startTime || 'Horário'}</span>
-                          </div>
-                          <p className="font-medium truncate pr-12">{lesson.studentName || 'Aluno'}</p>
-                          {lesson.subject && (
-                            <p className="text-[10px] opacity-70 truncate">{lesson.subject}</p>
-                          )}
+                              <div className="flex items-center gap-1 mb-1">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-semibold">{lesson.startTime || 'Horário'}</span>
+                              </div>
+                              <p className="font-medium truncate pr-12">{lesson.studentName || 'Aluno'}</p>
+                              {lesson.subject && (
+                                <p className="text-[10px] opacity-70 truncate">{lesson.subject}</p>
+                              )}
 
-                          {lesson.status === 'scheduled' && (
-                            <div className="flex gap-1 mt-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuickStatus(lesson, 'completed');
-                                }}
-                                className="flex-1 p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
-                                title="Marcar como concluída"
-                              >
-                                <Check className="w-3 h-3 mx-auto" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuickStatus(lesson, 'cancelled');
-                                }}
-                                className="flex-1 p-1 bg-rose-500 text-white rounded hover:bg-rose-600 transition-colors"
-                                title="Cancelar aula"
-                              >
-                                <X className="w-3 h-3 mx-auto" />
-                              </button>
-                            </div>
+                              {lesson.status === 'scheduled' && (
+                                <div className="flex gap-1 mt-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickStatus(lesson, 'completed');
+                                    }}
+                                    className="flex-1 p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                                    title="Marcar como concluída"
+                                  >
+                                    <Check className="w-3 h-3 mx-auto" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickStatus(lesson, 'cancelled');
+                                    }}
+                                    className="flex-1 p-1 bg-rose-500 text-white rounded hover:bg-rose-600 transition-colors"
+                                    title="Cancelar aula"
+                                  >
+                                    <X className="w-3 h-3 mx-auto" />
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       ))
