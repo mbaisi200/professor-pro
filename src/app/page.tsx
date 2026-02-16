@@ -210,16 +210,7 @@ export default function Dashboard() {
   // Calcular teacherId corretamente
   // Cada usuário (admin ou professor) vê apenas seus próprios dados
   const teacherId = useMemo(() => {
-    if (!userData) {
-      console.log('=== DEBUG DASHBOARD: userData é null/undefined ===');
-      return null;
-    }
-    console.log('=== DEBUG DASHBOARD ===');
-    console.log('userData:', userData);
-    console.log('userData.id:', userData.id);
-    console.log('userData.role:', userData.role);
-    console.log('teacherId calculado:', userData.id);
-    alert(`DEBUG Dashboard:\nuserData.id: ${userData.id}\nrole: ${userData.role}`);
+    if (!userData) return null;
     return userData.id;
   }, [userData]);
   
@@ -328,13 +319,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'} p-8`}>
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-800'} mb-4`}>
-            <p className="font-bold">DEBUG - Aguardando dados:</p>
-            <p>userData.id: {userData?.id || 'carregando...'}</p>
-            <p>userData.role: {userData?.role || 'carregando...'}</p>
-            <p>teacherId: {teacherId || 'null'}</p>
-          </div>
+        <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
           <LoadingSkeleton darkMode={darkMode} />
         </div>
       </AppLayout>
