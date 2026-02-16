@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== FUNÇÕES AUXILIARES ====================
+    
+    // Verifica se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Obtém o UID do usuário atual
+    function currentUserUid() {
+      return request.auth.uid;
+    }
+    
+    // Verifica se o usuário é admin (lê da coleção users)
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(currentUserUid())).data.role == 'admin';
+    }
+    
+    // Verifica se o usuário é dono do documento (teacherId == uid)
+    function isOwner(resource) {
+      return isAuthenticated() && resource.data.teacherId == currentUserUid();
+    }
+    
+    // Verifica se está criando documento com próprio teacherId
+    function isCreatingOwnData() {
+      return isAuthenticated() && request.resource.data.teacherId == currentUserUid();
+    }
+    
+    // ==================== COLEÇÃO: users ====================
+    // Armazena dados dos professores e admins
+    
+    match /users/{userId} {
+      // Usuário pode ler seus próprios dados
+      // Admin pode ler todos os usuários
+      allow read: if isAuthenticated() && (userId == currentUserUid() || isAdmin());
+      
+      // Usuário pode atualizar seus próprios dados (exceto role)
+      // Admin pode atualizar qualquer usuário
+      allow update: if isAuthenticated() && (userId == currentUserUid() || isAdmin()) &&
+        (!('role' in request.resource.data.diff(resource.data).affectedKeys()) || isAdmin());
+      
+      // Apenas admin pode criar e deletar usuários
+      allow create, delete: if isAdmin();
+    }
+    
+    // ==================== COLEÇÃO: students ====================
+    // Alunos associados a professores
+    
+    match /students/{studentId} {
+      // Professor pode ler apenas seus alunos
+      // Admin pode ler todos
+      allow read: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode criar alunos apenas para si mesmo
+      // Admin pode criar para qualquer professor
+      allow create: if isAuthenticated() && (isCreatingOwnData() || isAdmin());
+      
+      // Professor pode atualizar apenas seus alunos
+      // Admin pode atualizar qualquer aluno
+      allow update: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode deletar apenas seus alunos
+      // Admin pode deletar qualquer aluno
+      allow delete: if isAuthenticated() && (isOwner(resource) || isAdmin());
+    }
+    
+    // ==================== COLEÇÃO: lessons ====================
+    // Aulas associadas a professores
+    
+    match /lessons/{lessonId} {
+      // Professor pode ler apenas suas aulas
+      // Admin pode ler todas
+      allow read: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode criar aulas apenas para si mesmo
+      // Admin pode criar para qualquer professor
+      allow create: if isAuthenticated() && (isCreatingOwnData() || isAdmin());
+      
+      // Professor pode atualizar apenas suas aulas
+      // Admin pode atualizar qualquer aula
+      allow update: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode deletar apenas suas aulas
+      // Admin pode deletar qualquer aula
+      allow delete: if isAuthenticated() && (isOwner(resource) || isAdmin());
+    }
+    
+    // ==================== COLEÇÃO: payments ====================
+    // Pagamentos de alunos
+    
+    match /payments/{paymentId} {
+      // Professor pode ler apenas pagamentos relacionados a seus alunos
+      // Admin pode ler todos
+      allow read: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode criar pagamentos apenas para si mesmo
+      // Admin pode criar para qualquer professor
+      allow create: if isAuthenticated() && (isCreatingOwnData() || isAdmin());
+      
+      // Professor pode atualizar apenas seus pagamentos
+      // Admin pode atualizar qualquer pagamento
+      allow update: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      
+      // Professor pode deletar apenas seus pagamentos
+      // Admin pode deletar qualquer pagamento
+      allow delete: if isAuthenticated() && (isOwner(resource) || isAdmin());
+    }
+    
+    // ==================== COLEÇÃO: teacher_payments ====================
+    // Pagamentos feitos aos professores
+    
+    match /teacher_payments/{paymentId} {
+      // Admin pode ver todos os pagamentos
+      // Professor pode ver apenas pagamentos relacionados a si
+      allow read: if isAuthenticated() && 
+        (resource.data.teacherId == currentUserUid() || isAdmin());
+      
+      // Apenas admin pode criar pagamentos para professores
+      allow create: if isAdmin();
+      
+      // Apenas admin pode atualizar pagamentos
+      allow update: if isAdmin();
+      
+      // Apenas admin pode deletar pagamentos
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== COLEÇÃO: teachers ====================
+    // Dados adicionais de professores (se existir)
+    
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated() && (teacherId == currentUserUid() || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    // ==================== NEGAR TUDO MAIS ====================
+    // Bloqueia qualquer outra coleção não definida acima
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
