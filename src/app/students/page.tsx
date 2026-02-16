@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,6 +19,58 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { firestoreService, COLLECTIONS } from '@/lib/firestore-helpers';
+
+// Função para calcular o tempo de estudo
+function calculateStudyTime(startDate: string | null): string {
+  if (!startDate) return '';
+  
+  const start = new Date(startDate);
+  const today = new Date();
+  
+  // Validar se a data é válida
+  if (isNaN(start.getTime())) return '';
+  
+  // Se a data de início é no futuro, não mostrar
+  if (start > today) return '';
+  
+  let years = today.getFullYear() - start.getFullYear();
+  let months = today.getMonth() - start.getMonth();
+  let days = today.getDate() - start.getDate();
+  
+  // Ajustar dias negativos
+  if (days < 0) {
+    months--;
+    const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += lastMonth.getDate();
+  }
+  
+  // Ajustar meses negativos
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  // Montar a string de tempo
+  const parts: string[] = [];
+  
+  if (years > 0) {
+    parts.push(`${years} ${years === 1 ? 'ano' : 'anos'}`);
+  }
+  
+  if (months > 0) {
+    parts.push(`${months} ${months === 1 ? 'mês' : 'meses'}`);
+  }
+  
+  if (days > 0 && years === 0) { // Só mostrar dias se for menos de 1 ano
+    parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`);
+  }
+  
+  if (parts.length === 0) {
+    return 'Iniciou hoje';
+  }
+  
+  return parts.join(', ');
+}
 
 interface Student {
   id: string;
@@ -379,6 +432,7 @@ export default function StudentsPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { user, loading, userData } = useAuth();
   const router = useRouter();
@@ -441,6 +495,9 @@ export default function StudentsPage() {
         toast({ title: 'Aluno cadastrado!' });
       }
 
+      // Invalidar cache do React Query para atualizar o Dashboard
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      
       setShowForm(false);
       setEditingStudent(null);
       fetchStudents();
@@ -461,6 +518,10 @@ export default function StudentsPage() {
     try {
       await firestoreService.delete(COLLECTIONS.STUDENTS, id);
       toast({ title: 'Aluno excluído!' });
+      
+      // Invalidar cache do React Query para atualizar o Dashboard
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      
       fetchStudents();
     } catch (error) {
       toast({
@@ -646,6 +707,16 @@ export default function StudentsPage() {
                       </span>
                       <span className={`font-bold text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         R$ {student.monthlyFee.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Tempo de Estudo */}
+                  {student.startDate && (
+                    <div className={`flex items-center gap-1.5 text-xs py-1.5 ${student.monthlyFee ? '' : 'border-t border-dashed border-slate-200 dark:border-slate-700 mt-2'}`}>
+                      <Clock className={`w-3 h-3 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+                      <span className={darkMode ? 'text-blue-300' : 'text-blue-600'}>
+                        <strong>Estudando:</strong> {calculateStudyTime(student.startDate)}
                       </span>
                     </div>
                   )}

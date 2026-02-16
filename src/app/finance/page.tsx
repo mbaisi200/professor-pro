@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
@@ -11,12 +13,14 @@ import {
   Filter,
   CheckCircle2,
   Clock,
-  MoreVertical,
   Edit,
   Trash2,
   Receipt,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,12 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,9 +43,11 @@ interface Payment {
   studentId: string | null;
   amount: number;
   paymentDate: string | null;
+  dueDate: string | null;
   status: string;
   referenceMonth: string | null;
   teacherId?: string | null;
+  createdAt?: any;
 }
 
 interface Student {
@@ -141,6 +141,7 @@ function PaymentForm({
               <option value="">Selecione um aluno</option>
               {students
                 .filter((s) => s.status === 'active')
+                .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                 .map((student) => (
                   <option key={student.id} value={student.id}>
                     {student.name}
@@ -223,8 +224,19 @@ function PaymentForm({
   );
 }
 
+// Sort Icon Component
+function SortIcon({ field, sortField, sortDirection }: { field: string; sortField: string; sortDirection: 'asc' | 'desc' }) {
+  if (sortField !== field) {
+    return <ArrowUpDown className="w-4 h-4 ml-1 opacity-40" />;
+  }
+  return sortDirection === 'asc' 
+    ? <ArrowUp className="w-4 h-4 ml-1 text-blue-500" />
+    : <ArrowDown className="w-4 h-4 ml-1 text-blue-500" />;
+}
+
 export default function FinancePage() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
   const [payments, setPayments] = useState<Payment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -233,7 +245,10 @@ export default function FinancePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState<'paymentDate' | 'studentName' | 'amount' | 'status' | 'referenceMonth'>('paymentDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { user, loading, userData } = useAuth();
   const router = useRouter();
@@ -243,14 +258,9 @@ export default function FinancePage() {
   const monthEnd = endOfMonth(today);
 
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved) setDarkMode(JSON.parse(saved));
-  }, []);
-
-  useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
-    } else if (user) {
+    } else if (user && userData?.id) {
       fetchData();
     }
   }, [user, loading, router, userData]);
@@ -262,9 +272,7 @@ export default function FinancePage() {
         firestoreService.getAll<Payment>(COLLECTIONS.PAYMENTS),
         firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
       ]);
-      
-      // Cada usuário (admin ou professor) vê apenas seus próprios dados
-      // Usar userData.id (document ID) em vez de user?.uid (Firebase Auth UID)
+
       if (userData?.id) {
         setPayments(paymentsData.filter(p => p.teacherId === userData.id));
         setStudents(studentsData.filter(s => s.teacherId === userData.id));
@@ -289,7 +297,6 @@ export default function FinancePage() {
         paymentDate: data.paymentDate || null,
         status: data.status,
         referenceMonth: data.referenceMonth || null,
-        // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
         teacherId: userData?.id || null,
       };
 
@@ -300,6 +307,9 @@ export default function FinancePage() {
         await firestoreService.create(COLLECTIONS.PAYMENTS, paymentData);
         toast({ title: 'Pagamento registrado!' });
       }
+
+      // Invalidar cache para atualizar outras páginas
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
 
       setShowForm(false);
       setEditingPayment(null);
@@ -316,6 +326,7 @@ export default function FinancePage() {
     try {
       await firestoreService.delete(COLLECTIONS.PAYMENTS, id);
       toast({ title: 'Pagamento excluído!' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
       fetchData();
     } catch (error) {
       toast({ title: 'Erro ao excluir pagamento', variant: 'destructive' });
@@ -329,16 +340,78 @@ export default function FinancePage() {
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
       });
       toast({ title: 'Pagamento confirmado!' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
       fetchData();
     } catch (error) {
       toast({ title: 'Erro ao confirmar pagamento', variant: 'destructive' });
     }
   };
 
+  // Handle sort
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'paymentDate' ? 'desc' : 'asc');
+    }
+  };
+
+  // Filtered and sorted payments
+  const filteredPayments = useMemo(() => {
+    let result = payments.filter((p) => {
+      const matchesSearch = p.studentName?.toLowerCase().includes(search.toLowerCase()) ?? false;
+      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    // Sort
+    result.sort((a, b) => {
+      let valueA: string | number;
+      let valueB: string | number;
+
+      switch (sortField) {
+        case 'paymentDate':
+          // Tratar nulos - colocar no final
+          if (!a.paymentDate && !b.paymentDate) return 0;
+          if (!a.paymentDate) return 1;
+          if (!b.paymentDate) return -1;
+          valueA = new Date(a.paymentDate).getTime();
+          valueB = new Date(b.paymentDate).getTime();
+          break;
+        case 'studentName':
+          valueA = (a.studentName || '').toLowerCase();
+          valueB = (b.studentName || '').toLowerCase();
+          break;
+        case 'amount':
+          valueA = a.amount || 0;
+          valueB = b.amount || 0;
+          break;
+        case 'status':
+          valueA = a.status;
+          valueB = b.status;
+          break;
+        case 'referenceMonth':
+          valueA = a.referenceMonth || '';
+          valueB = b.referenceMonth || '';
+          break;
+        default:
+          valueA = 0;
+          valueB = 0;
+      }
+
+      if (valueA < valueB) return sortDirection === 'asc' ? -1 : 1;
+      if (valueA > valueB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [payments, search, statusFilter, sortField, sortDirection]);
+
   const monthlyIncome = payments
     .filter((p) => p.status === 'paid' && p.paymentDate)
     .filter((p) => {
-      const payDate = parseISO(p.paymentDate);
+      const payDate = parseISO(p.paymentDate!);
       return payDate >= monthStart && payDate <= monthEnd;
     })
     .reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -346,12 +419,6 @@ export default function FinancePage() {
   const pendingPayments = payments
     .filter((p) => p.status === 'pending' || p.status === 'overdue')
     .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-  const filteredPayments = payments.filter((p) => {
-    const matchesSearch = p.studentName?.toLowerCase().includes(search.toLowerCase()) ?? false;
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
 
   const statusColors: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
@@ -477,19 +544,64 @@ export default function FinancePage() {
               <table className="w-full">
                 <thead className={`border-b ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-100'}`}>
                   <tr>
-                    <th className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                      Aluno
+                    <th 
+                      onClick={() => handleSort('studentName')}
+                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Aluno
+                        <SortIcon field="studentName" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
                     </th>
-                    <th className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                      Valor
+                    <th 
+                      onClick={() => handleSort('amount')}
+                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Valor
+                        <SortIcon field="amount" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
                     </th>
-                    <th className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                      Pagamento
+                    <th 
+                      onClick={() => handleSort('paymentDate')}
+                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Pagamento
+                        <SortIcon field="paymentDate" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
                     </th>
-                    <th className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                      Status
+                    <th 
+                      onClick={() => handleSort('referenceMonth')}
+                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Referência
+                        <SortIcon field="referenceMonth" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
                     </th>
-                    <th className={`text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
+                    <th 
+                      onClick={() => handleSort('status')}
+                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </th>
+                    <th className={`text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider ${
+                      darkMode ? 'text-slate-300' : 'text-slate-500'
+                    }`}>
                       Ações
                     </th>
                   </tr>
@@ -497,7 +609,7 @@ export default function FinancePage() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {filteredPayments.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12">
+                      <td colSpan={6} className="text-center py-12">
                         <Receipt className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
                         <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Nenhum pagamento encontrado</p>
                       </td>
@@ -516,18 +628,13 @@ export default function FinancePage() {
                           key={payment.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.03 }}
+                          transition={{ delay: index * 0.02 }}
                           className={darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}
                         >
                           <td className="px-4 py-3">
                             <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                               {payment.studentName || '-'}
                             </p>
-                            {payment.referenceMonth && (
-                              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Ref: {format(parseISO(payment.referenceMonth + '-01'), 'MMMM yyyy', { locale: ptBR })}
-                              </p>
-                            )}
                           </td>
                           <td className={`px-4 py-3 font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                             R$ {payment.amount?.toFixed(2)}
@@ -535,6 +642,11 @@ export default function FinancePage() {
                           <td className={`px-4 py-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                             {payment.paymentDate
                               ? format(parseISO(payment.paymentDate), 'dd/MM/yyyy')
+                              : '-'}
+                          </td>
+                          <td className={`px-4 py-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            {payment.referenceMonth
+                              ? format(parseISO(payment.referenceMonth + '-01'), 'MMM yyyy', { locale: ptBR })
                               : '-'}
                           </td>
                           <td className="px-4 py-3">
@@ -554,29 +666,25 @@ export default function FinancePage() {
                                   <CheckCircle2 className="w-4 h-4 mr-1" /> Confirmar
                                 </Button>
                               )}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditingPayment(payment);
-                                      setShowForm(true);
-                                    }}
-                                  >
-                                    <Edit className="w-4 h-4 mr-2" /> Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDelete(payment.id)}
-                                    className="text-rose-600"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" /> Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingPayment(payment);
+                                  setShowForm(true);
+                                }}
+                                className={darkMode ? 'text-slate-300 hover:bg-slate-600' : ''}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(payment.id)}
+                                className="text-rose-600 hover:bg-rose-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </td>
                         </motion.tr>
@@ -588,24 +696,50 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Form Modal */}
-          <AnimatePresence>
-            {showForm && (
-              <PaymentForm
-                payment={editingPayment}
-                students={students}
-                onSave={handleSave}
-                onCancel={() => {
-                  setShowForm(false);
-                  setEditingPayment(null);
-                }}
-                isLoading={isSaving}
-                darkMode={darkMode}
-              />
-            )}
-          </AnimatePresence>
+          {/* Summary */}
+          {filteredPayments.length > 0 && (
+            <div className={`mt-4 p-4 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              <div className="flex flex-wrap gap-6 justify-center">
+                <div className="text-center">
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total</p>
+                  <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    R$ {filteredPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Recebido</p>
+                  <p className="text-xl font-bold text-emerald-600">
+                    R$ {filteredPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pendente</p>
+                  <p className="text-xl font-bold text-amber-600">
+                    R$ {filteredPayments.filter(p => p.status === 'pending' || p.status === 'overdue').reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <PaymentForm
+            payment={editingPayment}
+            students={students}
+            onSave={handleSave}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingPayment(null);
+            }}
+            isLoading={isSaving}
+            darkMode={darkMode}
+          />
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 }
