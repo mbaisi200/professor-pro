@@ -363,21 +363,6 @@ export default function Dashboard() {
     <AppLayout>
       <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* DEBUG PANEL */}
-          <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-yellow-900 text-yellow-100' : 'bg-yellow-100 text-yellow-800'}`}>
-            <p className="font-bold">🔍 DEBUG INFO:</p>
-            <p>userData.id: <strong>{userData?.id || 'NULO'}</strong></p>
-            <p>userData.role: <strong>{userData?.role || 'NULO'}</strong></p>
-            <p>teacherId sendo usado: <strong>{teacherId || 'NULO'}</strong></p>
-            <p>Alunos carregados: <strong>{students.length}</strong></p>
-            <p>Aulas carregadas: <strong>{lessons.length}</strong></p>
-            <p>Pagamentos carregados: <strong>{payments.length}</strong></p>
-            <hr className="my-2 border-yellow-600" />
-            <p className="font-bold">📋 TeacherId dos alunos:</p>
-            {students.map(s => (
-              <p key={s.id}>• {s.name}: <strong>{s.teacherId || 'SEM TEACHERID!'}</strong></p>
-            ))}
-          </div>
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
