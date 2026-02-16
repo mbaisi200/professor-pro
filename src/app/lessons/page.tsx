@@ -20,6 +20,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Flag,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay, isToday, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +30,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { firestoreService, COLLECTIONS } from '@/lib/firestore-helpers';
+import { checkAndManageLessonCycle } from '@/lib/firestore';
 
 interface Lesson {
   id: string;
@@ -316,10 +318,48 @@ export default function LessonsPage() {
       };
 
       if (editingLesson) {
+        // Ao editar, verificar mudança de status para controle de ciclo
+        const previousStatus = editingLesson.status;
         await firestoreService.update(COLLECTIONS.LESSONS, editingLesson.id, lessonData);
+        
+        // Verificar ciclo se houver aluno vinculado e mudança de status relevante
+        if (data.studentId && data.status !== previousStatus) {
+          const cycleResult = await checkAndManageLessonCycle(
+            data.studentId,
+            data.status,
+            previousStatus,
+            userData?.id || ''
+          );
+          
+          if (cycleResult.markerCreated) {
+            toast({ 
+              title: '🎯 Ciclo Completo!', 
+              description: `${cycleResult.completedLessons} de ${cycleResult.contractedLessons} aulas concluídas. Novo ciclo iniciado.`
+            });
+          }
+        }
+        
         toast({ title: 'Aula atualizada!' });
       } else {
         await firestoreService.create(COLLECTIONS.LESSONS, lessonData);
+        
+        // Verificar ciclo para novas aulas concluídas
+        if (data.studentId && data.status === 'completed') {
+          const cycleResult = await checkAndManageLessonCycle(
+            data.studentId,
+            data.status,
+            null,
+            userData?.id || ''
+          );
+          
+          if (cycleResult.markerCreated) {
+            toast({ 
+              title: '🎯 Ciclo Completo!', 
+              description: `${cycleResult.completedLessons} de ${cycleResult.contractedLessons} aulas concluídas. Novo ciclo iniciado.`
+            });
+          }
+        }
+        
         toast({ title: 'Aula agendada!' });
       }
 
@@ -346,7 +386,26 @@ export default function LessonsPage() {
 
   const handleQuickStatus = async (lesson: Lesson, newStatus: string) => {
     try {
+      const previousStatus = lesson.status;
       await firestoreService.update(COLLECTIONS.LESSONS, lesson.id, { status: newStatus });
+      
+      // Verificar ciclo se houver aluno vinculado e mudança de status relevante
+      if (lesson.studentId && newStatus !== previousStatus) {
+        const cycleResult = await checkAndManageLessonCycle(
+          lesson.studentId,
+          newStatus,
+          previousStatus,
+          userData?.id || ''
+        );
+        
+        if (cycleResult.markerCreated) {
+          toast({ 
+            title: '🎯 Ciclo Completo!', 
+            description: `${cycleResult.completedLessons} de ${cycleResult.contractedLessons} aulas concluídas. Novo ciclo iniciado.`
+          });
+        }
+      }
+      
       toast({ title: 'Status atualizado!' });
       fetchData();
     } catch (error) {
@@ -817,52 +876,75 @@ export default function LessonsPage() {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.02 }}
-                                className={`${darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'} transition-colors`}
+                                className={`${
+                                  lesson.endOfCycle 
+                                    ? 'bg-amber-50 border-l-4 border-amber-400' 
+                                    : darkMode 
+                                      ? 'hover:bg-slate-700/50' 
+                                      : 'hover:bg-slate-50'
+                                } transition-colors`}
                               >
                                 <td className={`py-3 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                  {format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                  {lesson.endOfCycle ? (
+                                    <div className="flex items-center gap-2">
+                                      <Flag className="w-4 h-4 text-amber-500" />
+                                      <span className="font-medium text-amber-700">
+                                        {format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR })
+                                  )}
                                 </td>
                                 <td className={`py-3 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                                   {lesson.startTime || '--:--'}
                                 </td>
-                                <td className={`py-3 px-4 font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                <td className={`py-3 px-4 font-medium ${lesson.endOfCycle ? 'text-amber-700' : darkMode ? 'text-white' : 'text-slate-800'}`}>
                                   {lesson.studentName || '-'}
                                 </td>
                                 <td className={`py-3 px-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {lesson.subject || '-'}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    lesson.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                    lesson.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
-                                    lesson.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                    'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {statusLabels[lesson.status]}
-                                  </span>
+                                  {lesson.endOfCycle ? (
+                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                      🎯 Fim do Ciclo
+                                    </span>
+                                  ) : (
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      lesson.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                      lesson.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                      lesson.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                      'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {statusLabels[lesson.status]}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingLesson(lesson);
-                                        setShowForm(true);
-                                      }}
-                                      className="h-8 px-2"
-                                    >
-                                      <Edit className="w-4 h-4 text-blue-500" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDelete(lesson.id)}
-                                      className="h-8 px-2"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
-                                  </div>
+                                  {!lesson.endOfCycle && (
+                                    <div className="flex items-center justify-center gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingLesson(lesson);
+                                          setShowForm(true);
+                                        }}
+                                        className="h-8 px-2"
+                                      >
+                                        <Edit className="w-4 h-4 text-blue-500" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDelete(lesson.id)}
+                                        className="h-8 px-2"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </td>
                               </motion.tr>
                             ))}

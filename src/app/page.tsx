@@ -181,6 +181,7 @@ interface Lesson {
   studentName?: string | null;
   subject?: string | null;
   status: string;
+  endOfCycle?: boolean;
 }
 
 interface Payment {
@@ -298,8 +299,9 @@ export default function Dashboard() {
   // A receber = esperado - recebido do mês de referência
   const pendingAmount = Math.max(0, expectedMonthlyRevenue - monthlyIncome);
 
+  // Aulas concluídas - IGNORA marcadores de final de ciclo
   const completedLessons = lessons
-    .filter((l) => l.status === 'completed' && l.date)
+    .filter((l) => l.status === 'completed' && l.date && !l.endOfCycle)
     .filter((l) => {
       const lessonDate = parseISO(l.date);
       return lessonDate >= monthStart && lessonDate <= monthEnd;

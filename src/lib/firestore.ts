@@ -362,3 +362,143 @@ export async function updateTeacherPayment(id: string, data: Partial<TeacherPaym
 export async function deleteTeacherPayment(id: string) {
   await deleteDoc(doc(db, 'teacher_payments', id));
 }
+
+// ============== CYCLE MANAGEMENT ==============
+
+/**
+ * Verifica e gerencia o ciclo de aulas de um aluno.
+ * Deve ser chamado após criar ou atualizar uma aula.
+ * 
+ * @param studentId - ID do aluno
+ * @param lessonStatus - Status da aula ('completed', 'scheduled', 'cancelled', etc.)
+ * @param previousStatus - Status anterior da aula (se for edição)
+ * @param teacherId - ID do professor
+ * @returns Informações sobre o ciclo atualizado
+ */
+export async function checkAndManageLessonCycle(
+  studentId: string,
+  lessonStatus: string,
+  previousStatus: string | null,
+  teacherId: string
+): Promise<{
+  cycleCompleted: boolean;
+  completedLessons: number;
+  contractedLessons: number;
+  markerCreated: boolean;
+}> {
+  // Buscar dados do aluno
+  const student = await getStudent(studentId);
+  if (!student) {
+    return { cycleCompleted: false, completedLessons: 0, contractedLessons: 0, markerCreated: false };
+  }
+
+  // Se o aluno não tem aulas contratadas definidas, não verificar ciclo
+  if (!student.contractedLessons || student.contractedLessons <= 0) {
+    return { 
+      cycleCompleted: false, 
+      completedLessons: student.completedLessonsInCycle || 0, 
+      contractedLessons: 0, 
+      markerCreated: false 
+    };
+  }
+
+  let completedLessonsInCycle = student.completedLessonsInCycle || 0;
+
+  // Calcular variação no contador baseado na mudança de status
+  if (lessonStatus === 'completed' && previousStatus !== 'completed') {
+    // Aula foi concluída (nova ou alterada de outro status)
+    completedLessonsInCycle += 1;
+  } else if (lessonStatus !== 'completed' && previousStatus === 'completed') {
+    // Aula deixou de ser concluída (foi cancelada, remarcada, etc.)
+    completedLessonsInCycle = Math.max(0, completedLessonsInCycle - 1);
+  }
+
+  // Atualizar contador do aluno
+  await updateStudent(studentId, { 
+    completedLessonsInCycle,
+    endOfCycle: false
+  });
+
+  // Verificar se atingiu o limite do ciclo
+  if (completedLessonsInCycle >= student.contractedLessons) {
+    // Verificar se já existe marcador de ciclo para este aluno
+    const lessonsRef = collection(db, 'lessons');
+    const q = query(
+      lessonsRef, 
+      where('studentId', '==', studentId),
+      where('endOfCycle', '==', true)
+    );
+    const existingMarkers = await getDocs(q);
+
+    // Só criar marcador se não existir
+    if (existingMarkers.empty) {
+      // Criar marcador de final de ciclo
+      const today = new Date();
+      const markerData: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'> = {
+        date: today.toISOString().split('T')[0],
+        startTime: null,
+        studentId: studentId,
+        studentName: student.name,
+        subject: student.subject || null,
+        contentCovered: `🎯 FIM DO CICLO DE AULAS - ${completedLessonsInCycle} de ${student.contractedLessons} aulas concluídas`,
+        status: 'completed',
+        endOfCycle: true,
+        teacherId: teacherId,
+      };
+      
+      await addDoc(collection(db, 'lessons'), {
+        ...markerData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Atualizar aluno para indicar que está no final do ciclo
+      await updateStudent(studentId, { 
+        endOfCycle: true,
+        completedLessonsInCycle: 0 // Reset para novo ciclo
+      });
+
+      return {
+        cycleCompleted: true,
+        completedLessons: completedLessonsInCycle,
+        contractedLessons: student.contractedLessons,
+        markerCreated: true
+      };
+    }
+
+    return {
+      cycleCompleted: true,
+      completedLessons: completedLessonsInCycle,
+      contractedLessons: student.contractedLessons,
+      markerCreated: false // Já existia marcador
+    };
+  }
+
+  return {
+    cycleCompleted: false,
+    completedLessons: completedLessonsInCycle,
+    contractedLessons: student.contractedLessons,
+    markerCreated: false
+  };
+}
+
+/**
+ * Verifica se uma aula é um marcador de final de ciclo
+ */
+export function isEndOfCycleMarker(lesson: Lesson): boolean {
+  return lesson.endOfCycle === true;
+}
+
+/**
+ * Filtra aulas removendo marcadores de ciclo (para dashboards e relatórios)
+ */
+export function filterRegularLessons(lessons: Lesson[]): Lesson[] {
+  return lessons.filter(lesson => !lesson.endOfCycle);
+}
+
+/**
+ * Retorna apenas os marcadores de ciclo
+ */
+export function getCycleMarkers(lessons: Lesson[]): Lesson[] {
+  return lessons.filter(lesson => lesson.endOfCycle === true);
+}
