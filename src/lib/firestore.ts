@@ -457,6 +457,7 @@ export async function checkAndManageLessonCycle(
   // Se já passou do limite, o momento exato já passou e não criamos o marcador
   if (completedLessonsInCycle === student.contractedLessons) {
     // Criar um NOVO registro de marcador de final de ciclo (não altera a aula existente)
+    // IMPORTANTE: status 'cycle_end' para NÃO contar como aula dada
     const markerData: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'> = {
       date: today.toISOString().split('T')[0],
       startTime: null,
@@ -464,7 +465,7 @@ export async function checkAndManageLessonCycle(
       studentName: student.name,
       subject: student.subject || null,
       contentCovered: `🎯 FIM DO CICLO DE AULAS - ${completedLessonsInCycle} de ${student.contractedLessons} aulas concluídas`,
-      status: 'completed',
+      status: 'cycle_end', // Status especial - NÃO conta como aula dada
       endOfCycle: true,
       teacherId: teacherId,
     };

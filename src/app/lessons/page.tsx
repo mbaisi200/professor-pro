@@ -688,6 +688,7 @@ export default function LessonsPage() {
     completed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     cancelled: 'bg-rose-100 text-rose-700 border-rose-200',
     rescheduled: 'bg-amber-100 text-amber-700 border-amber-200',
+    cycle_end: 'bg-purple-100 text-purple-700 border-purple-200',
   };
 
   const statusLabels: Record<string, string> = {
@@ -695,6 +696,7 @@ export default function LessonsPage() {
     completed: 'Concluída',
     cancelled: 'Cancelada',
     rescheduled: 'Remarcada',
+    cycle_end: 'Fim do Ciclo',
   };
 
   if (loading || isLoading) {
