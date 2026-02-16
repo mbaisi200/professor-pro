@@ -372,6 +372,11 @@ export default function Dashboard() {
             <p>Alunos carregados: <strong>{students.length}</strong></p>
             <p>Aulas carregadas: <strong>{lessons.length}</strong></p>
             <p>Pagamentos carregados: <strong>{payments.length}</strong></p>
+            <hr className="my-2 border-yellow-600" />
+            <p className="font-bold">📋 TeacherId dos alunos:</p>
+            {students.map(s => (
+              <p key={s.id}>• {s.name}: <strong>{s.teacherId || 'SEM TEACHERID!'}</strong></p>
+            ))}
           </div>
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
