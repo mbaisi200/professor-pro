@@ -366,6 +366,22 @@ export async function deleteTeacherPayment(id: string) {
 // ============== CYCLE MANAGEMENT ==============
 
 /**
+ * Recalcula o contador de aulas concluídas baseado nas aulas reais no banco.
+ * Isso é necessário quando marcadores são excluídos ou há inconsistência.
+ */
+async function recalculateCompletedLessons(studentId: string): Promise<number> {
+  const lessonsRef = collection(db, 'lessons');
+  const q = query(
+    lessonsRef,
+    where('studentId', '==', studentId),
+    where('status', '==', 'completed'),
+    where('endOfCycle', '==', false)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.length;
+}
+
+/**
  * Verifica e gerencia o ciclo de aulas de um aluno.
  * Deve ser chamado após criar ou atualizar uma aula.
  * 
@@ -405,29 +421,23 @@ export async function checkAndManageLessonCycle(
     };
   }
 
-  // Calcular contador atual baseado no status
-  let completedLessonsInCycle = student.completedLessonsInCycle || 0;
+  // RECALCULAR: Sempre recalcular o total real de aulas concluídas do banco
+  // Isso garante consistência mesmo após exclusão de marcadores
+  const actualCompletedLessons = await recalculateCompletedLessons(studentId);
 
-  // Calcular variação no contador baseado na mudança de status
+  // Calcular contador atual baseado no valor real recalculado
+  let completedLessonsInCycle = actualCompletedLessons;
+
+  // Ajustar baseado na mudança de status da aula atual
   if (lessonStatus === 'completed' && previousStatus !== 'completed') {
-    // Aula foi concluída (nova ou alterada de outro status)
-    completedLessonsInCycle += 1;
+    // Aula foi concluída (nova ou alterada de outro status) - já está no contador
+    // Não precisa incrementar pois já foi contado no recalculateCompletedLessons
   } else if (lessonStatus !== 'completed' && previousStatus === 'completed') {
-    // Aula deixou de ser concluída (foi cancelada, remarcada, etc.)
+    // Aula deixou de ser concluída - decrementar
     completedLessonsInCycle = Math.max(0, completedLessonsInCycle - 1);
   }
 
-  // Atualizar contador do aluno (sem resetar ainda)
-  await updateStudent(studentId, { 
-    completedLessonsInCycle,
-    endOfCycle: false
-  });
-
-  // Obter mês atual para verificação
-  const today = new Date();
-  const currentMonth = today.toISOString().slice(0, 7); // formato: "2024-01"
-
-  // Verificar se já existe marcador de ciclo para este aluno NO MÊS ATUAL
+  // Verificar se já existe marcador de ciclo para este aluno
   const lessonsRef = collection(db, 'lessons');
   const q = query(
     lessonsRef, 
@@ -436,28 +446,34 @@ export async function checkAndManageLessonCycle(
   );
   const existingMarkers = await getDocs(q);
   
-  // Filtrar marcadores do mês atual
-  const currentMonthMarkers = existingMarkers.docs.filter(doc => {
-    const markerData = doc.data();
-    const markerMonth = markerData.date?.slice(0, 7); // extrai "YYYY-MM" da data
-    return markerMonth === currentMonth;
-  });
-
-  // Se já existe marcador neste mês, não criar outro
-  if (currentMonthMarkers.length > 0) {
+  // Se já existe marcador, não criar outro
+  if (existingMarkers.docs.length > 0) {
+    // Atualizar contador do aluno
+    await updateStudent(studentId, { 
+      completedLessonsInCycle,
+      endOfCycle: true
+    });
+    
     return {
       cycleCompleted: true,
       completedLessons: completedLessonsInCycle,
       contractedLessons: student.contractedLessons,
-      markerCreated: false // Já existe marcador neste mês
+      markerCreated: false // Já existe marcador
     };
   }
 
-  // REGRA: Criar marcador APENAS na EXATA igualdade
-  // Se já passou do limite, o momento exato já passou e não criamos o marcador
+  // Atualizar contador do aluno
+  await updateStudent(studentId, { 
+    completedLessonsInCycle,
+    endOfCycle: false
+  });
+
+  // Obter data de hoje
+  const today = new Date();
+
+  // REGRA: Criar marcador quando atinge exatamente o total contratado
   if (completedLessonsInCycle === student.contractedLessons) {
-    // Criar um NOVO registro de marcador de final de ciclo (não altera a aula existente)
-    // IMPORTANTE: status 'cycle_end' para NÃO contar como aula dada
+    // Criar um NOVO registro de marcador de final de ciclo
     const markerData: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'> = {
       date: today.toISOString().split('T')[0],
       startTime: null,
@@ -465,23 +481,22 @@ export async function checkAndManageLessonCycle(
       studentName: student.name,
       subject: student.subject || null,
       contentCovered: `🎯 FIM DO CICLO DE AULAS - ${completedLessonsInCycle} de ${student.contractedLessons} aulas concluídas`,
-      status: 'cycle_end', // Status especial - NÃO conta como aula dada
+      status: 'cycle_end',
       endOfCycle: true,
       teacherId: teacherId,
     };
     
-    // Criar registro SEPARADO (não sobrescreve a aula existente)
+    // Criar registro SEPARADO
     await addDoc(collection(db, 'lessons'), {
       ...markerData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
 
-    // Atualizar aluno para indicar que está no final do ciclo
-    // E resetar contador para iniciar novo ciclo
+    // Atualizar aluno - resetar contador para novo ciclo
     await updateStudent(studentId, { 
       endOfCycle: true,
-      completedLessonsInCycle: 0 // Reset para novo ciclo
+      completedLessonsInCycle: 0
     });
 
     return {
@@ -492,8 +507,7 @@ export async function checkAndManageLessonCycle(
     };
   }
 
-  // Se passou do limite mas não tinha marcador, não criar (o momento exato já passou)
-  // Isso pode acontecer se o sistema falhou em criar o marcador anteriormente
+  // Se passou do limite, não criar (o momento exato já passou)
   if (completedLessonsInCycle > student.contractedLessons) {
     return {
       cycleCompleted: false,
