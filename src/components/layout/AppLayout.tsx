@@ -16,7 +16,11 @@ import {
   LogOut,
   X,
   Shield,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -53,6 +57,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     return false;
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [dbOnline, setDbOnline] = useState(true); // Status do banco de dados
   const pathname = usePathname();
   const router = useRouter();
   const { user, userData, loading, signOut } = useAuth();
@@ -62,6 +67,34 @@ export function AppLayout({ children }: AppLayoutProps) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Monitorar conexão com o banco de dados
+  useEffect(() => {
+    if (!user) return;
+
+    // Tentar escutar um documento para verificar conexão
+    const unsubscribe = onSnapshot(
+      doc(db, 'connection_check', 'status'),
+      () => {
+        setDbOnline(true);
+      },
+      (error) => {
+        console.error('Firestore connection error:', error);
+        setDbOnline(false);
+      }
+    );
+
+    // Verificação periódica
+    const interval = setInterval(() => {
+      // Se passou mais de 30 segundos sem resposta, marcar como offline
+      // O onSnapshot vai atualizar automaticamente quando reconectar
+    }, 30000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -154,6 +187,36 @@ export function AppLayout({ children }: AppLayoutProps) {
             {darkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
             <span className="text-sm">{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
           </Button>
+          
+          {/* Status do Banco de Dados */}
+          <div 
+            className={`mt-3 p-3 rounded-xl flex items-center gap-3 ${
+              dbOnline 
+                ? 'bg-emerald-500/20 border border-emerald-400/30' 
+                : 'bg-red-500/20 border border-red-400/30'
+            }`}
+          >
+            {dbOnline ? (
+              <>
+                <div className="relative">
+                  <Wifi className="w-5 h-5 text-emerald-400" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-emerald-400">Banco Online</p>
+                  <p className="text-xs text-emerald-300/70">Conectado</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-5 h-5 text-red-400" />
+                <div>
+                  <p className="text-sm font-medium text-red-400">Banco Offline</p>
+                  <p className="text-xs text-red-300/70">Sem conexão</p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <nav className="px-3 space-y-1 pb-40">

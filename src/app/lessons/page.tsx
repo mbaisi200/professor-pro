@@ -613,35 +613,45 @@ export default function LessonsPage() {
             </div>
           </motion.div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - Layout Moderno */}
           <motion.div 
             initial={{ opacity: 0, y: 10 }} 
             animate={{ opacity: 1, y: 0 }} 
-            className="flex flex-wrap gap-3 mb-6"
+            className={`flex flex-wrap items-center gap-3 mb-6 p-4 rounded-xl shadow-sm border ${
+              darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+            }`}
           >
             <Button
               onClick={() => {
                 setEditingLesson(null);
                 setShowForm(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-emerald-600 hover:bg-emerald-700 shadow-sm"
             >
               <Plus className="w-4 h-4 mr-2" /> Nova Aula
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowReport(false)}
-              className={!showReport ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
-            >
-              <Calendar className="w-4 h-4 mr-2" /> Calendário
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowReport(true)}
-              className={showReport ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
-            >
-              <FileText className="w-4 h-4 mr-2" /> Relatório
-            </Button>
+            
+            <div className="h-8 w-px bg-slate-200 dark:bg-slate-600 hidden sm:block"></div>
+            
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Visualização:</span>
+              <Button
+                variant={!showReport ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowReport(false)}
+                className={!showReport ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              >
+                <Calendar className="w-4 h-4 mr-2" /> Semanal
+              </Button>
+              <Button
+                variant={showReport ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowReport(true)}
+                className={showReport ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              >
+                <FileText className="w-4 h-4 mr-2" /> Lista
+              </Button>
+            </div>
           </motion.div>
 
           {/* Report Panel */}
@@ -867,38 +877,85 @@ export default function LessonsPage() {
           {/* Week Navigation and View */}
           {!showReport && (
             <>
+              {/* Navegação Semanal Moderna */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className={`flex items-center justify-between mb-6 rounded-xl p-4 shadow-sm border ${
+                className={`mb-6 rounded-xl shadow-sm border overflow-hidden ${
                   darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
                 }`}
               >
-                <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}>
-                  <ChevronLeft className="w-5 h-5" />
-                </Button>
-
-                <div className="text-center">
-                  <p className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    {format(weekStart, 'dd MMM', { locale: ptBR })} -{' '}
-                    {format(weekEnd, 'dd MMM yyyy', { locale: ptBR })}
-                  </p>
-                  <button
-                    onClick={() => setCurrentWeek(new Date())}
-                    className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'} hover:underline`}
+                {/* Header da navegação */}
+                <div className={`flex items-center justify-between p-4 ${
+                  darkMode ? 'bg-slate-700/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'
+                }`}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+                    className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
                   >
-                    Ir para hoje
-                  </button>
+                    <ChevronLeft className="w-4 h-4" /> Anterior
+                  </Button>
+
+                  <div className="text-center">
+                    <div className="flex items-center gap-2">
+                      <Calendar className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                      <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {format(weekStart, "dd 'de' MMMM", { locale: ptBR })} -{' '}
+                        {format(weekEnd, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setCurrentWeek(new Date())}
+                      className={`text-sm mt-1 px-3 py-1 rounded-full transition-colors ${
+                        darkMode 
+                          ? 'text-blue-400 hover:bg-slate-600' 
+                          : 'text-blue-600 hover:bg-blue-100'
+                      }`}
+                    >
+                      📍 Ir para semana atual
+                    </button>
+                  </div>
+
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+                    className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
+                  >
+                    Próxima <ChevronRight className="w-4 h-4" />
+                  </Button>
                 </div>
 
-                <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}>
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
+                {/* Mini resumo da semana */}
+                <div className={`flex items-center justify-center gap-6 py-3 px-4 border-t ${
+                  darkMode ? 'border-slate-700' : 'border-slate-100'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full bg-emerald-500`}></span>
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {lessons.filter(l => l.status === 'completed' && weekDays.some(d => isSameDay(parseISO(l.date), d))).length} Concluídas
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full bg-blue-500`}></span>
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {lessons.filter(l => l.status === 'scheduled' && weekDays.some(d => isSameDay(parseISO(l.date), d))).length} Agendadas
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full bg-red-500`}></span>
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {lessons.filter(l => l.status === 'cancelled' && weekDays.some(d => isSameDay(parseISO(l.date), d))).length} Canceladas
+                    </span>
+                  </div>
+                </div>
               </motion.div>
 
-              {/* Week View */}
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {/* Week View - Cards de Dias */}
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             {weekDays.map((day, index) => {
               const dayLessons = getLessonsForDay(day);
               const isCurrentDay = isToday(day);
@@ -909,37 +966,66 @@ export default function LessonsPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`rounded-xl p-4 shadow-sm border ${
+                  className={`rounded-xl shadow-sm border transition-all hover:shadow-md ${
                     isCurrentDay
-                      ? 'border-slate-800 ring-1 ring-slate-800'
+                      ? darkMode
+                        ? 'bg-gradient-to-b from-blue-900/50 to-slate-800 border-blue-500 ring-2 ring-blue-500/50'
+                        : 'bg-gradient-to-b from-blue-50 to-white border-blue-400 ring-2 ring-blue-400/30'
                       : darkMode
-                      ? 'bg-slate-800 border-slate-700'
-                      : 'bg-white border-slate-100'
+                      ? 'bg-slate-800 border-slate-700 hover:border-slate-600'
+                      : 'bg-white border-slate-100 hover:border-slate-200'
                   }`}
                 >
-                  <div className="text-center mb-3">
-                    <p className={`text-xs uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {/* Header do dia */}
+                  <div className={`text-center p-3 border-b ${
+                    isCurrentDay
+                      ? darkMode ? 'border-blue-500/30' : 'border-blue-200'
+                      : darkMode ? 'border-slate-700' : 'border-slate-100'
+                  }`}>
+                    <p className={`text-xs uppercase tracking-wider font-medium ${
+                      isCurrentDay 
+                        ? darkMode ? 'text-blue-400' : 'text-blue-600'
+                        : darkMode ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
                       {format(day, 'EEE', { locale: ptBR })}
                     </p>
-                    <p className={`text-2xl font-bold ${isCurrentDay ? 'text-slate-800' : darkMode ? 'text-white' : 'text-slate-600'}`}>
-                      {format(day, 'dd')}
-                    </p>
+                    <div className="flex items-center justify-center gap-1">
+                      <p className={`text-2xl font-bold ${
+                        isCurrentDay 
+                          ? darkMode ? 'text-blue-400' : 'text-blue-600'
+                          : darkMode ? 'text-white' : 'text-slate-700'
+                      }`}>
+                        {format(day, 'dd')}
+                      </p>
+                      {isCurrentDay && (
+                        <span className="text-xs">📍</span>
+                      )}
+                    </div>
+                    {dayLessons.length > 0 && (
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {dayLessons.length} {dayLessons.length === 1 ? 'aula' : 'aulas'}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-2 min-h-[100px]">
+                  {/* Lista de aulas */}
+                  <div className="p-2 space-y-2 min-h-[80px]">
                     {dayLessons.length === 0 ? (
-                      <p className={`text-xs text-center py-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <p className={`text-xs text-center py-6 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         Sem aulas
                       </p>
                     ) : (
                       dayLessons.map((lesson) => (
                         <div
                           key={lesson.id}
-                          className={`p-2 rounded-lg border text-xs ${statusColors[lesson.status]} relative group`}
+                          className={`p-2 rounded-lg border text-xs ${statusColors[lesson.status]} relative group cursor-pointer hover:shadow-sm transition-shadow`}
                         >
                           <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingLesson(lesson);
                                 setShowForm(true);
                               }}
@@ -948,7 +1034,10 @@ export default function LessonsPage() {
                               <Edit className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={() => handleDelete(lesson.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(lesson.id);
+                              }}
                               className="p-1 bg-red-600 text-white rounded hover:bg-red-700"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -957,7 +1046,7 @@ export default function LessonsPage() {
 
                           <div className="flex items-center gap-1 mb-1">
                             <Clock className="w-3 h-3" />
-                            <span className="font-medium">{lesson.startTime || 'Horário'}</span>
+                            <span className="font-semibold">{lesson.startTime || 'Horário'}</span>
                           </div>
                           <p className="font-medium truncate pr-12">{lesson.studentName || 'Aluno'}</p>
                           {lesson.subject && (
@@ -967,14 +1056,22 @@ export default function LessonsPage() {
                           {lesson.status === 'scheduled' && (
                             <div className="flex gap-1 mt-2">
                               <button
-                                onClick={() => handleQuickStatus(lesson, 'completed')}
-                                className="flex-1 p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickStatus(lesson, 'completed');
+                                }}
+                                className="flex-1 p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                                title="Marcar como concluída"
                               >
                                 <Check className="w-3 h-3 mx-auto" />
                               </button>
                               <button
-                                onClick={() => handleQuickStatus(lesson, 'cancelled')}
-                                className="flex-1 p-1 bg-rose-500 text-white rounded hover:bg-rose-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickStatus(lesson, 'cancelled');
+                                }}
+                                className="flex-1 p-1 bg-rose-500 text-white rounded hover:bg-rose-600 transition-colors"
+                                title="Cancelar aula"
                               >
                                 <X className="w-3 h-3 mx-auto" />
                               </button>
