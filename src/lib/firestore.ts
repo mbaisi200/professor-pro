@@ -369,6 +369,9 @@ export async function deleteTeacherPayment(id: string) {
  * Verifica e gerencia o ciclo de aulas de um aluno.
  * Deve ser chamado após criar ou atualizar uma aula.
  * 
+ * REGRA: O marcador de fim de ciclo é criado APENAS quando o total de aulas
+ * concluídas atinge EXATAMENTE o total contratado (igualdade, não >=).
+ * 
  * @param studentId - ID do aluno
  * @param lessonStatus - Status da aula ('completed', 'scheduled', 'cancelled', etc.)
  * @param previousStatus - Status anterior da aula (se for edição)
@@ -402,6 +405,7 @@ export async function checkAndManageLessonCycle(
     };
   }
 
+  // Calcular contador atual baseado no status
   let completedLessonsInCycle = student.completedLessonsInCycle || 0;
 
   // Calcular variação no contador baseado na mudança de status
@@ -413,64 +417,88 @@ export async function checkAndManageLessonCycle(
     completedLessonsInCycle = Math.max(0, completedLessonsInCycle - 1);
   }
 
-  // Atualizar contador do aluno
+  // Atualizar contador do aluno (sem resetar ainda)
   await updateStudent(studentId, { 
     completedLessonsInCycle,
     endOfCycle: false
   });
 
-  // Verificar se atingiu o limite do ciclo
-  if (completedLessonsInCycle >= student.contractedLessons) {
-    // Verificar se já existe marcador de ciclo para este aluno
-    const lessonsRef = collection(db, 'lessons');
-    const q = query(
-      lessonsRef, 
-      where('studentId', '==', studentId),
-      where('endOfCycle', '==', true)
-    );
-    const existingMarkers = await getDocs(q);
+  // Obter mês atual para verificação
+  const today = new Date();
+  const currentMonth = today.toISOString().slice(0, 7); // formato: "2024-01"
 
-    // Só criar marcador se não existir
-    if (existingMarkers.empty) {
-      // Criar marcador de final de ciclo
-      const today = new Date();
-      const markerData: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'> = {
-        date: today.toISOString().split('T')[0],
-        startTime: null,
-        studentId: studentId,
-        studentName: student.name,
-        subject: student.subject || null,
-        contentCovered: `🎯 FIM DO CICLO DE AULAS - ${completedLessonsInCycle} de ${student.contractedLessons} aulas concluídas`,
-        status: 'completed',
-        endOfCycle: true,
-        teacherId: teacherId,
-      };
-      
-      await addDoc(collection(db, 'lessons'), {
-        ...markerData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+  // Verificar se já existe marcador de ciclo para este aluno NO MÊS ATUAL
+  const lessonsRef = collection(db, 'lessons');
+  const q = query(
+    lessonsRef, 
+    where('studentId', '==', studentId),
+    where('endOfCycle', '==', true)
+  );
+  const existingMarkers = await getDocs(q);
+  
+  // Filtrar marcadores do mês atual
+  const currentMonthMarkers = existingMarkers.docs.filter(doc => {
+    const markerData = doc.data();
+    const markerMonth = markerData.date?.slice(0, 7); // extrai "YYYY-MM" da data
+    return markerMonth === currentMonth;
+  });
 
-      // Atualizar aluno para indicar que está no final do ciclo
-      await updateStudent(studentId, { 
-        endOfCycle: true,
-        completedLessonsInCycle: 0 // Reset para novo ciclo
-      });
+  // Se já existe marcador neste mês, não criar outro
+  if (currentMonthMarkers.length > 0) {
+    return {
+      cycleCompleted: true,
+      completedLessons: completedLessonsInCycle,
+      contractedLessons: student.contractedLessons,
+      markerCreated: false // Já existe marcador neste mês
+    };
+  }
 
-      return {
-        cycleCompleted: true,
-        completedLessons: completedLessonsInCycle,
-        contractedLessons: student.contractedLessons,
-        markerCreated: true
-      };
-    }
+  // REGRA: Criar marcador APENAS na EXATA igualdade
+  // Se já passou do limite, o momento exato já passou e não criamos o marcador
+  if (completedLessonsInCycle === student.contractedLessons) {
+    // Criar um NOVO registro de marcador de final de ciclo (não altera a aula existente)
+    const markerData: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'> = {
+      date: today.toISOString().split('T')[0],
+      startTime: null,
+      studentId: studentId,
+      studentName: student.name,
+      subject: student.subject || null,
+      contentCovered: `🎯 FIM DO CICLO DE AULAS - ${completedLessonsInCycle} de ${student.contractedLessons} aulas concluídas`,
+      status: 'completed',
+      endOfCycle: true,
+      teacherId: teacherId,
+    };
+    
+    // Criar registro SEPARADO (não sobrescreve a aula existente)
+    await addDoc(collection(db, 'lessons'), {
+      ...markerData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Atualizar aluno para indicar que está no final do ciclo
+    // E resetar contador para iniciar novo ciclo
+    await updateStudent(studentId, { 
+      endOfCycle: true,
+      completedLessonsInCycle: 0 // Reset para novo ciclo
+    });
 
     return {
       cycleCompleted: true,
       completedLessons: completedLessonsInCycle,
       contractedLessons: student.contractedLessons,
-      markerCreated: false // Já existia marcador
+      markerCreated: true
+    };
+  }
+
+  // Se passou do limite mas não tinha marcador, não criar (o momento exato já passou)
+  // Isso pode acontecer se o sistema falhou em criar o marcador anteriormente
+  if (completedLessonsInCycle > student.contractedLessons) {
+    return {
+      cycleCompleted: false,
+      completedLessons: completedLessonsInCycle,
+      contractedLessons: student.contractedLessons,
+      markerCreated: false
     };
   }
 

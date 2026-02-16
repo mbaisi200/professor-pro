@@ -408,7 +408,7 @@ export default function StudentsPage() {
         completedLessonsInCycle: editingStudent?.completedLessonsInCycle || 0,
         endOfCycle: data.endOfCycle || false,
         startDate: data.startDate || null,
-        notes: data.notes || null,
+        notes: data.notes ? data.notes.toUpperCase() : null,
         // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
         teacherId: userData?.id || null,
       };

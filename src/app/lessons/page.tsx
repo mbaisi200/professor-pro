@@ -165,6 +165,7 @@ function LessonForm({
               <option value="">Selecione um aluno</option>
               {students
                 .filter((s) => s.status === 'active')
+                .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                 .map((student) => (
                   <option key={student.id} value={student.id}>
                     {student.name}
