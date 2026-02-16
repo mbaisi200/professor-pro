@@ -240,6 +240,8 @@ export default function LessonsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'mensal' | 'semanal' | 'todas'>('mensal');
   const [showForm, setShowForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -257,6 +259,8 @@ export default function LessonsPage() {
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
 
   useEffect(() => {
     const saved = localStorage.getItem('darkMode');
@@ -636,20 +640,28 @@ export default function LessonsPage() {
             <div className="flex items-center gap-2">
               <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Visualização:</span>
               <Button
-                variant={!showReport ? 'default' : 'outline'}
+                variant={viewMode === 'mensal' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setShowReport(false)}
-                className={!showReport ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                onClick={() => setViewMode('mensal')}
+                className={viewMode === 'mensal' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              >
+                <Calendar className="w-4 h-4 mr-2" /> Mensal
+              </Button>
+              <Button
+                variant={viewMode === 'semanal' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('semanal')}
+                className={viewMode === 'semanal' ? 'bg-blue-600 hover:bg-blue-700' : ''}
               >
                 <Calendar className="w-4 h-4 mr-2" /> Semanal
               </Button>
               <Button
-                variant={showReport ? 'default' : 'outline'}
+                variant={viewMode === 'todas' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setShowReport(true)}
-                className={showReport ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                onClick={() => setViewMode('todas')}
+                className={viewMode === 'todas' ? 'bg-blue-600 hover:bg-blue-700' : ''}
               >
-                <FileText className="w-4 h-4 mr-2" /> Lista
+                <FileText className="w-4 h-4 mr-2" /> Todas
               </Button>
             </div>
           </motion.div>
@@ -877,45 +889,47 @@ export default function LessonsPage() {
           {/* Week Navigation and View */}
           {!showReport && (
             <>
-              {/* Navegação Semanal Moderna */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className={`mb-6 rounded-xl shadow-sm border overflow-hidden ${
-                  darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
-                }`}
-              >
-                {/* Header da navegação */}
-                <div className={`flex items-center justify-between p-4 ${
-                  darkMode ? 'bg-slate-700/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'
-                }`}>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-                    className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
+              {/* Navegação Baseada no Modo de Visualização */}
+              {viewMode === 'semanal' && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className={`mb-6 rounded-xl shadow-sm border overflow-hidden ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+                    }`}
                   >
-                    <ChevronLeft className="w-4 h-4" /> Anterior
-                  </Button>
-
-                  <div className="text-center">
-                    <div className="flex items-center gap-2">
-                      <Calendar className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                      <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                        {format(weekStart, "dd 'de' MMMM", { locale: ptBR })} -{' '}
-                        {format(weekEnd, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setCurrentWeek(new Date())}
-                      className={`text-sm mt-1 px-3 py-1 rounded-full transition-colors ${
-                        darkMode 
-                          ? 'text-blue-400 hover:bg-slate-600' 
-                          : 'text-blue-600 hover:bg-blue-100'
-                      }`}
+                  {/* Header da navegação */}
+                  <div className={`flex items-center justify-between p-4 ${
+                    darkMode ? 'bg-slate-700/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'
+                  }`}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+                      className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
                     >
-                      📍 Ir para semana atual
+                      <ChevronLeft className="w-4 h-4" /> Anterior
+                    </Button>
+
+                    <div className="text-center">
+                      <div className="flex items-center gap-2">
+                        <Calendar className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {format(weekStart, "dd 'de' MMMM", { locale: ptBR })} -{' '}
+                          {format(weekEnd, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setCurrentWeek(new Date())}
+                        className={`text-sm mt-1 px-3 py-1 rounded-full transition-colors ${
+                          darkMode 
+                            ? 'text-blue-400 hover:bg-slate-600' 
+                            : 'text-blue-600 hover:bg-blue-100'
+                        }`}
+                      >
+                        📍 Ir para semana atual
                     </button>
                   </div>
 
@@ -956,7 +970,7 @@ export default function LessonsPage() {
 
               {/* Week View - Cards de Dias */}
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-            {weekDays.map((day, index) => {
+                {weekDays.map((day, index) => {
               const dayLessons = getLessonsForDay(day);
               const isCurrentDay = isToday(day);
 
@@ -1085,6 +1099,237 @@ export default function LessonsPage() {
               );
             })}
               </div>
+              </>
+              )}
+
+              {/* Visualização Mensal */}
+              {viewMode === 'mensal' && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mb-6 rounded-xl shadow-sm border overflow-hidden ${
+                      darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+                    }`}
+                  >
+                    <div className={`flex items-center justify-between p-4 ${
+                      darkMode ? 'bg-slate-700/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'
+                    }`}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}
+                        className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Anterior
+                      </Button>
+
+                      <div className="text-center">
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+                        </p>
+                        <button
+                          onClick={() => setCurrentMonth(new Date())}
+                          className={`text-sm mt-1 px-3 py-1 rounded-full transition-colors ${
+                            darkMode 
+                              ? 'text-blue-400 hover:bg-slate-600' 
+                              : 'text-blue-600 hover:bg-blue-100'
+                          }`}
+                        >
+                          📍 Ir para mês atual
+                        </button>
+                      </div>
+
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}
+                        className={`gap-1 ${darkMode ? 'hover:bg-slate-600' : 'hover:bg-blue-100'}`}
+                      >
+                        Próximo <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {/* Resumo do mês */}
+                    <div className={`flex items-center justify-center gap-6 py-3 px-4 border-t ${
+                      darkMode ? 'border-slate-700' : 'border-slate-100'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full bg-emerald-500`}></span>
+                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {lessons.filter(l => l.status === 'completed' && parseISO(l.date) >= monthStart && parseISO(l.date) <= monthEnd).length} Concluídas
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full bg-blue-500`}></span>
+                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {lessons.filter(l => l.status === 'scheduled' && parseISO(l.date) >= monthStart && parseISO(l.date) <= monthEnd).length} Agendadas
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full bg-red-500`}></span>
+                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {lessons.filter(l => l.status === 'cancelled' && parseISO(l.date) >= monthStart && parseISO(l.date) <= monthEnd).length} Canceladas
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Lista de Aulas do Mês */}
+                  <div className={`rounded-xl border overflow-hidden ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+                  }`}>
+                    {lessons
+                      .filter(l => parseISO(l.date) >= monthStart && parseISO(l.date) <= monthEnd)
+                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                      .length === 0 ? (
+                        <div className="text-center py-12">
+                          <BookOpen className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+                          <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Nenhuma aula neste mês
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                          {lessons
+                            .filter(l => parseISO(l.date) >= monthStart && parseISO(l.date) <= monthEnd)
+                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                            .map((lesson, index) => (
+                              <motion.div
+                                key={lesson.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.02 }}
+                                className={`flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="text-center">
+                                    <p className={`text-xs uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      {format(parseISO(lesson.date), 'EEE', { locale: ptBR })}
+                                    </p>
+                                    <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                      {format(parseISO(lesson.date), 'dd')}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                      {lesson.studentName || 'Aluno'}
+                                    </p>
+                                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      {lesson.startTime || '--:--'} • {lesson.subject || 'Geral'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    lesson.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                    lesson.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                    lesson.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                    'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {statusLabels[lesson.status]}
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => { setEditingLesson(lesson); setShowForm(true); }}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDelete(lesson.id)}
+                                      className="text-red-500"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                        </div>
+                      )}
+                  </div>
+                </>
+              )}
+
+              {/* Visualização Todas */}
+              {viewMode === 'todas' && (
+                <div className={`rounded-xl border overflow-hidden ${
+                  darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+                }`}>
+                  {lessons.length === 0 ? (
+                    <div className="text-center py-12">
+                      <BookOpen className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+                      <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Nenhuma aula cadastrada
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                      {lessons
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((lesson, index) => (
+                          <motion.div
+                            key={lesson.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.01 }}
+                            className={`flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="text-center">
+                                <p className={`text-xs uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {format(parseISO(lesson.date), 'EEE', { locale: ptBR })}
+                                </p>
+                                <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {format(parseISO(lesson.date), 'dd/MM')}
+                                </p>
+                              </div>
+                              <div>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                  {lesson.studentName || 'Aluno'}
+                                </p>
+                                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {lesson.startTime || '--:--'} • {lesson.subject || 'Geral'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                lesson.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                lesson.status === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                lesson.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {statusLabels[lesson.status]}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setEditingLesson(lesson); setShowForm(true); }}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(lesson.id)}
+                                  className="text-red-500"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 

@@ -451,14 +451,16 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(search.toLowerCase()) ||
-      (student.email?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-      (student.subject?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredStudents = students
+    .filter((student) => {
+      const matchesSearch =
+        student.name.toLowerCase().includes(search.toLowerCase()) ||
+        (student.email?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (student.subject?.toLowerCase().includes(search.toLowerCase()) ?? false);
+      const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const statusColors: Record<string, string> = {
     active: 'bg-emerald-100 text-emerald-700',
@@ -565,32 +567,32 @@ export default function StudentsPage() {
               )}
             </motion.div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {filteredStudents.map((student, index) => (
                 <motion.div
                   key={student.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`rounded-2xl p-5 shadow-sm border ${
+                  transition={{ delay: index * 0.03 }}
+                  className={`rounded-xl p-3 shadow-sm border ${
                     darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
                           darkMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700'
                         }`}
                       >
                         {student.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                           {student.name}
                         </h3>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${statusColors[student.status]}`}
+                          className={`text-xs px-1.5 py-0.5 rounded-full ${statusColors[student.status]}`}
                         >
                           {statusLabels[student.status]}
                         </span>
@@ -598,26 +600,18 @@ export default function StudentsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 mb-4">
+                  <div className="space-y-1 mb-2">
                     {student.subject && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <BookOpen className="w-4 h-4 text-slate-400" />
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <BookOpen className="w-3 h-3 text-slate-400" />
                         <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
                           {student.subject}
                         </span>
                       </div>
                     )}
-                    {student.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-slate-400" />
-                        <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
-                          {student.email}
-                        </span>
-                      </div>
-                    )}
                     {student.phone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-slate-400" />
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <Phone className="w-3 h-3 text-slate-400" />
                         <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
                           {student.phone}
                         </span>
@@ -626,17 +620,17 @@ export default function StudentsPage() {
                   </div>
 
                   {student.monthlyFee && (
-                    <div className="flex items-center justify-between mb-4">
-                      <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <div className="flex items-center justify-between mb-2 py-1.5 border-t border-dashed border-slate-200 dark:border-slate-700">
+                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                         Mensalidade
                       </span>
-                      <span className={`font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <span className={`font-bold text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         R$ {student.monthlyFee.toFixed(2)}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 pt-1">
                     <Button
                       variant="outline"
                       size="sm"
@@ -644,17 +638,17 @@ export default function StudentsPage() {
                         setEditingStudent(student);
                         setShowForm(true);
                       }}
-                      className="flex-1"
+                      className="flex-1 h-7 text-xs"
                     >
-                      <Edit className="w-4 h-4 mr-1" /> Editar
+                      <Edit className="w-3 h-3 mr-1" /> Editar
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(student.id)}
-                      className="text-red-600 hover:bg-red-50"
+                      className="h-7 px-2 text-red-600 hover:bg-red-50"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </motion.div>
