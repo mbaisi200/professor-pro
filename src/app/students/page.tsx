@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -33,6 +34,7 @@ interface Student {
   status: string;
   contractedLessons: number | null;
   completedLessonsInCycle: number;
+  endOfCycle: boolean;
   startDate: string | null;
   notes: string | null;
 }
@@ -64,6 +66,7 @@ function StudentForm({
     status: student?.status || 'active',
     chargeFee: student?.chargeFee !== false,
     contractedLessons: student?.contractedLessons || '',
+    endOfCycle: student?.endOfCycle || false,
     startDate: student?.startDate || '',
     notes: student?.notes || '',
   });
@@ -253,6 +256,46 @@ function StudentForm({
             </Select>
           </div>
 
+          {/* Aulas Contratadas */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Aulas Contratadas/Mês
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={form.contractedLessons}
+                onChange={(e) => setForm({ ...form, contractedLessons: e.target.value })}
+                placeholder="Ex: 8"
+                className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+              />
+              <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Quantidade de aulas por mês
+              </p>
+            </div>
+            <div>
+              <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Final do Ciclo?
+              </label>
+              <Select 
+                value={form.endOfCycle ? 'sim' : 'nao'} 
+                onValueChange={(v) => setForm({ ...form, endOfCycle: v === 'sim' })}
+              >
+                <SelectTrigger className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nao">Não</SelectItem>
+                  <SelectItem value="sim">Sim</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Aluno está no final do ciclo?
+              </p>
+            </div>
+          </div>
+
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
               Data de Início
@@ -306,7 +349,8 @@ function StudentForm({
 }
 
 export default function StudentsPage() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -318,11 +362,6 @@ export default function StudentsPage() {
 
   const { user, loading, userData } = useAuth();
   const router = useRouter();
-
-  useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved) setDarkMode(JSON.parse(saved));
-  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -367,6 +406,7 @@ export default function StudentsPage() {
         status: data.status,
         contractedLessons: data.contractedLessons ? parseInt(data.contractedLessons) : null,
         completedLessonsInCycle: editingStudent?.completedLessonsInCycle || 0,
+        endOfCycle: data.endOfCycle || false,
         startDate: data.startDate || null,
         notes: data.notes || null,
         // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)

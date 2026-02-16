@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import {
   LayoutDashboard,
   Users,
@@ -42,25 +43,15 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    // Initialize from localStorage if available (client-side only)
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('darkMode');
-      if (saved) {
-        const isDark = JSON.parse(saved);
-        if (isDark) {
-          document.documentElement.classList.add('dark');
-        }
-        return isDark;
-      }
-    }
-    return false;
-  });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [dbOnline, setDbOnline] = useState(true); // Status do banco de dados
   const pathname = usePathname();
   const router = useRouter();
   const { user, userData, loading, signOut } = useAuth();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  
+  // Determinar se está em modo escuro
+  const darkMode = resolvedTheme === 'dark';
 
   useEffect(() => {
     if (!loading && !user) {
@@ -96,15 +87,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     };
   }, [user]);
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem('darkMode', JSON.stringify(newMode));
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+  // Função para alternar tema
+  const toggleTheme = () => {
+    setTheme(darkMode ? 'light' : 'dark');
   };
 
   const isActive = (href: string) => {
@@ -179,14 +164,35 @@ export function AppLayout({ children }: AppLayoutProps) {
               <X className="w-5 h-5" />
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            onClick={toggleDarkMode}
-            className="mt-4 w-full text-white hover:bg-white/10 justify-start"
+          {/* Toggle de Tema Moderno */}
+          <div 
+            className={`mt-4 p-1 rounded-xl flex items-center gap-1 ${
+              darkMode ? 'bg-slate-700' : 'bg-blue-500/30'
+            }`}
           >
-            {darkMode ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
-            <span className="text-sm">{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
-          </Button>
+            <button
+              onClick={() => setTheme('light')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all ${
+                !darkMode 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Sun className="w-4 h-4" />
+              <span className="text-sm font-medium">Claro</span>
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all ${
+                darkMode 
+                  ? 'bg-slate-600 text-white shadow-sm' 
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              <Moon className="w-4 h-4" />
+              <span className="text-sm font-medium">Escuro</span>
+            </button>
+          </div>
           
           {/* Status do Banco de Dados */}
           <div 
