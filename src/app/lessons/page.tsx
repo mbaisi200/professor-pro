@@ -607,7 +607,7 @@ export default function LessonsPage() {
                 <td>${lesson.startTime || '--:--'}</td>
                 <td>${lesson.studentName || '-'}</td>
                 <td>${lesson.subject || '-'}</td>
-                <td class="status-${lesson.status}">${statusLabels[lesson.status]}</td>
+                <td class="status-${lesson.status}">${lesson.endOfCycle ? '🎯 FIM DO CICLO' : statusLabels[lesson.status]}</td>
                 <td>${lesson.contentCovered || '-'}</td>
               </tr>
             `).join('')}
@@ -629,6 +629,52 @@ export default function LessonsPage() {
 
     printWindow.document.write(html);
     printWindow.document.close();
+  };
+
+  const handleExportExcel = () => {
+    const reportData = getFilteredLessonsForReport();
+    const studentName = reportStudent === 'all' 
+      ? 'Todos os Alunos' 
+      : students.find(s => s.id === reportStudent)?.name || 'Aluno';
+    
+    const periodLabel = {
+      'all': 'Todo Período',
+      'current_month': format(new Date(), "MMMM 'de' yyyy", { locale: ptBR }),
+      'last_month': format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), "MMMM 'de' yyyy", { locale: ptBR }),
+      'last_3_months': 'Últimos 3 meses',
+      'current_year': `Ano de ${new Date().getFullYear()}`,
+    }[reportPeriod] || 'Período';
+
+    // Criar CSV para Excel
+    const headers = ['Data', 'Horário', 'Aluno', 'Matéria', 'Status', 'Conteúdo'];
+    const rows = reportData.map(lesson => [
+      format(parseISO(lesson.date), 'dd/MM/yyyy', { locale: ptBR }),
+      lesson.startTime || '--:--',
+      lesson.studentName || '-',
+      lesson.subject || '-',
+      lesson.endOfCycle ? 'FIM DO CICLO' : statusLabels[lesson.status],
+      lesson.contentCovered || '-'
+    ]);
+
+    // Montar CSV
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+
+    // Adicionar BOM para UTF-8
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_aulas_${format(new Date(), 'dd-MM-yyyy')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: 'Excel exportado com sucesso!' });
   };
 
   const getLessonsForDay = (day: Date) => {
@@ -693,6 +739,14 @@ export default function LessonsPage() {
               className="bg-emerald-600 hover:bg-emerald-700 shadow-sm"
             >
               <Plus className="w-4 h-4 mr-2" /> Nova Aula
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => setShowReport(!showReport)}
+              className={showReport ? 'bg-amber-100 text-amber-700 border-amber-300' : ''}
+            >
+              <FileText className="w-4 h-4 mr-2" /> Relatórios
             </Button>
             
             <div className="h-8 w-px bg-slate-200 dark:bg-slate-600 hidden sm:block"></div>
@@ -790,12 +844,18 @@ export default function LessonsPage() {
                   </div>
 
                   {/* Botão Exportar */}
-                  <div className="flex items-end">
+                  <div className="flex items-end gap-2">
                     <Button
                       onClick={handleExportPDF}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      className="flex-1 bg-red-600 hover:bg-red-700"
                     >
-                      <Download className="w-4 h-4 mr-2" /> Exportar PDF
+                      <Download className="w-4 h-4 mr-2" /> PDF
+                    </Button>
+                    <Button
+                      onClick={handleExportExcel}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" /> Excel
                     </Button>
                   </div>
                 </div>
@@ -877,9 +937,10 @@ export default function LessonsPage() {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.02 }}
+                                style={lesson.endOfCycle ? { backgroundColor: '#fef3c7' } : undefined}
                                 className={`${
                                   lesson.endOfCycle 
-                                    ? 'bg-amber-100! border-l-4 border-amber-500 shadow-sm' 
+                                    ? 'border-l-4 border-amber-500' 
                                     : darkMode 
                                       ? 'hover:bg-slate-700/50' 
                                       : 'hover:bg-slate-50'
