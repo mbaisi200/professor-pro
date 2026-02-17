@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -28,6 +28,17 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useFirestore';
+
+// Helper para SSR-safe localStorage
+function getLocalStorage(key: string, defaultValue: string): string {
+  if (typeof window === 'undefined') return defaultValue;
+  return localStorage.getItem(key) || defaultValue;
+}
+
+function subscribe(callback: () => void) {
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
 
 // Expiration Modal
 function ExpirationModal({ darkMode }: { darkMode: boolean }) {
@@ -197,14 +208,15 @@ interface Payment {
 }
 
 export default function Dashboard() {
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('darkMode');
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
+  // SSR-safe initial values usando useSyncExternalStore
+  const darkModeStorage = useSyncExternalStore(
+    subscribe,
+    () => getLocalStorage('darkMode', 'false'),
+    () => 'false'
+  );
+  const darkMode = JSON.parse(darkModeStorage);
+  
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
 
   const { user, userData, loading: authLoading, isExpired } = useAuth();
   const queryClient = useQueryClient();
