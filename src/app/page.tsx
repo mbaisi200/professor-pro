@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -30,17 +30,6 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useFirestore';
-
-// Helper para SSR-safe localStorage
-function getLocalStorage(key: string, defaultValue: string): string {
-  if (typeof window === 'undefined') return defaultValue;
-  return localStorage.getItem(key) || defaultValue;
-}
-
-function subscribe(callback: () => void) {
-  window.addEventListener('storage', callback);
-  return () => window.removeEventListener('storage', callback);
-}
 
 // Expiration Modal
 function ExpirationModal({ darkMode }: { darkMode: boolean }) {
@@ -210,21 +199,22 @@ interface Payment {
 }
 
 export default function Dashboard() {
-  // SSR-safe initial values usando useSyncExternalStore
-  const darkModeStorage = useSyncExternalStore(
-    subscribe,
-    () => getLocalStorage('darkMode', 'false'),
-    () => 'false'
-  );
-  const darkMode = JSON.parse(darkModeStorage);
-  
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [whatsappConfigured, setWhatsappConfigured] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   const { user, userData, loading: authLoading, isExpired } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  
+  // Carregar preferências do cliente
+  useEffect(() => {
+    const saved = localStorage.getItem('darkMode');
+    setDarkMode(saved === 'true');
+    setMounted(true);
+  }, []);
   
   // Calcular teacherId corretamente
   // Cada usuário (admin ou professor) vê apenas seus próprios dados
@@ -265,6 +255,15 @@ export default function Dashboard() {
   const currentDay = today.getDate();
   const currentMonth = format(today, 'yyyy-MM');
   const formattedToday = format(today, "EEEE, dd 'de' MMMM", { locale: ptBR });
+
+  // Aguardar montagem no cliente
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   // Se expirado, mostrar modal
   if (isExpired) {
