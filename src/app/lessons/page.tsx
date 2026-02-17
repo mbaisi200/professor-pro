@@ -1127,7 +1127,7 @@ export default function LessonsPage() {
                                     </span>
                                   )}
                                 </td>
-                                <td className={`py-2 px-3 text-sm max-w-[200px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} title={lesson.contentCovered || ''}>
+                                <td className={`py-2 px-3 text-sm max-w-[200px] whitespace-normal break-words ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {lesson.contentCovered || '-'}
                                 </td>
                               </tr>
