@@ -21,8 +21,7 @@ import {
   WifiOff,
   MessageSquare,
 } from 'lucide-react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { doc, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -66,6 +65,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (!user) return;
 
     // Tentar escutar um documento para verificar conexão
+    const db = getFirestore();
     const unsubscribe = onSnapshot(
       doc(db, 'connection_check', 'status'),
       () => {

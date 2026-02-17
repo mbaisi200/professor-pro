@@ -12,8 +12,8 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, getFirestore } from 'firebase/firestore';
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase';
 import { isBefore, parseISO } from 'date-fns';
 import { refreshAllCyclesForTeacher } from '@/lib/firestore';
 
@@ -49,22 +49,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 let userCache: { uid: string; data: UserData } | null = null;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    // Inicializar com usuário cacheado se disponível
-    const cachedUser = auth.currentUser;
-    return cachedUser;
-  });
-  const [userData, setUserData] = useState<UserData | null>(() => {
-    // Inicializar com dados cacheados se disponíveis
-    if (userCache && auth.currentUser && userCache.uid === auth.currentUser.uid) {
-      return userCache.data;
-    }
-    return null;
-  });
-  const [loading, setLoading] = useState(!auth.currentUser);
-  const [initialized, setInitialized] = useState(!!auth.currentUser);
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
+    const db = getFirebaseDb();
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       
@@ -158,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     try {
       setLoading(true);
+      const auth = getFirebaseAuth();
       await signInWithEmailAndPassword(auth, email, password);
       return {};
     } catch (error: any) {
@@ -178,11 +172,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     userCache = null;
+    const auth = getFirebaseAuth();
     await firebaseSignOut(auth);
   }, []);
 
   const createUser = useCallback(async (email: string, password: string, name: string, role: 'admin' | 'teacher' = 'teacher') => {
     try {
+      const auth = getFirebaseAuth();
+      const db = getFirebaseDb();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
       
@@ -210,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserData = useCallback(async (data: Partial<UserData>) => {
     if (!user) return;
+    const db = getFirebaseDb();
     await setDoc(doc(db, 'users', user.uid), data, { merge: true });
     const newData = userData ? { ...userData, ...data } : null;
     setUserData(newData);

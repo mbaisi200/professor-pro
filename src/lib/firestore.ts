@@ -11,7 +11,10 @@ import {
   setDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { getFirebaseDb } from './firebase';
+
+// Helper para obter db
+const getDb = () => getFirebaseDb();
 
 // Types
 export interface Student {
@@ -100,6 +103,7 @@ export async function getStudents(teacherId?: string) {
   console.log('=== getStudents chamado ===');
   console.log('teacherId parametro:', teacherId);
   
+  const db = getDb();
   const studentsRef = collection(db, 'students');
   const q = teacherId 
     ? query(studentsRef, where('teacherId', '==', teacherId))
@@ -122,6 +126,7 @@ export async function getStudents(teacherId?: string) {
 }
 
 export async function getStudent(id: string) {
+  const db = getDb();
   const docRef = doc(db, 'students', id);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -134,6 +139,7 @@ export async function getStudent(id: string) {
 }
 
 export async function createStudent(data: Omit<Student, 'id' | 'createdAt' | 'updatedAt'>) {
+  const db = getDb();
   const docRef = await addDoc(collection(db, 'students'), {
     ...data,
     status: data.status || 'active',
@@ -146,6 +152,7 @@ export async function createStudent(data: Omit<Student, 'id' | 'createdAt' | 'up
 }
 
 export async function updateStudent(id: string, data: Partial<Student>) {
+  const db = getDb();
   const docRef = doc(db, 'students', id);
   await updateDoc(docRef, {
     ...data,
@@ -155,11 +162,13 @@ export async function updateStudent(id: string, data: Partial<Student>) {
 }
 
 export async function deleteStudent(id: string) {
+  const db = getDb();
   await deleteDoc(doc(db, 'students', id));
 }
 
 // ============== TEACHERS ==============
 export async function getTeachers() {
+  const db = getDb();
   const snapshot = await getDocs(collection(db, 'users'));
   return snapshot.docs.map(doc => ({
     id: doc.id,
@@ -169,6 +178,7 @@ export async function getTeachers() {
 }
 
 export async function getTeacher(id: string) {
+  const db = getDb();
   const docRef = doc(db, 'users', id);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -180,6 +190,7 @@ export async function getTeacher(id: string) {
 }
 
 export async function createTeacher(data: Omit<Teacher, 'id' | 'createdAt'>) {
+  const db = getDb();
   await setDoc(doc(db, 'users', data.uid), {
     ...data,
     status: 'active',
@@ -189,11 +200,13 @@ export async function createTeacher(data: Omit<Teacher, 'id' | 'createdAt'>) {
 }
 
 export async function deleteTeacher(id: string) {
+  const db = getDb();
   await deleteDoc(doc(db, 'users', id));
 }
 
 // ============== LESSONS ==============
 export async function getLessons(teacherId?: string) {
+  const db = getDb();
   const lessonsRef = collection(db, 'lessons');
   const q = teacherId 
     ? query(lessonsRef, where('teacherId', '==', teacherId))
@@ -212,6 +225,7 @@ export async function getLessons(teacherId?: string) {
 }
 
 export async function getLesson(id: string) {
+  const db = getDb();
   const docRef = doc(db, 'lessons', id);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -224,6 +238,7 @@ export async function getLesson(id: string) {
 }
 
 export async function createLesson(data: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt'>) {
+  const db = getDb();
   const docRef = await addDoc(collection(db, 'lessons'), {
     ...data,
     status: data.status || 'scheduled',
@@ -235,6 +250,7 @@ export async function createLesson(data: Omit<Lesson, 'id' | 'createdAt' | 'upda
 }
 
 export async function updateLesson(id: string, data: Partial<Lesson>) {
+  const db = getDb();
   const docRef = doc(db, 'lessons', id);
   await updateDoc(docRef, {
     ...data,
@@ -244,11 +260,13 @@ export async function updateLesson(id: string, data: Partial<Lesson>) {
 }
 
 export async function deleteLesson(id: string) {
+  const db = getDb();
   await deleteDoc(doc(db, 'lessons', id));
 }
 
 // ============== PAYMENTS ==============
 export async function getPayments(teacherId?: string) {
+  const db = getDb();
   const paymentsRef = collection(db, 'payments');
   const q = teacherId 
     ? query(paymentsRef, where('teacherId', '==', teacherId))
@@ -271,6 +289,7 @@ export async function getPayments(teacherId?: string) {
 }
 
 export async function getPayment(id: string) {
+  const db = getDb();
   const docRef = doc(db, 'payments', id);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -283,6 +302,7 @@ export async function getPayment(id: string) {
 }
 
 export async function createPayment(data: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>) {
+  const db = getDb();
   const docRef = await addDoc(collection(db, 'payments'), {
     ...data,
     status: data.status || 'pending',
@@ -293,6 +313,7 @@ export async function createPayment(data: Omit<Payment, 'id' | 'createdAt' | 'up
 }
 
 export async function updatePayment(id: string, data: Partial<Payment>) {
+  const db = getDb();
   const docRef = doc(db, 'payments', id);
   await updateDoc(docRef, {
     ...data,
@@ -302,11 +323,13 @@ export async function updatePayment(id: string, data: Partial<Payment>) {
 }
 
 export async function deletePayment(id: string) {
+  const db = getDb();
   await deleteDoc(doc(db, 'payments', id));
 }
 
 // ============== TEACHER PAYMENTS ==============
 export async function getTeacherPayments(teacherId?: string) {
+  const db = getDb();
   const paymentsRef = collection(db, 'teacher_payments');
   const q = teacherId 
     ? query(paymentsRef, where('teacherId', '==', teacherId))
@@ -329,6 +352,7 @@ export async function getTeacherPayments(teacherId?: string) {
 }
 
 export async function getTeacherPayment(id: string) {
+  const db = getDb();
   const docRef = doc(db, 'teacher_payments', id);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -341,6 +365,7 @@ export async function getTeacherPayment(id: string) {
 }
 
 export async function createTeacherPayment(data: Omit<TeacherPayment, 'id' | 'createdAt' | 'updatedAt'>) {
+  const db = getDb();
   const docRef = await addDoc(collection(db, 'teacher_payments'), {
     ...data,
     status: data.status || 'pending',
@@ -351,6 +376,7 @@ export async function createTeacherPayment(data: Omit<TeacherPayment, 'id' | 'cr
 }
 
 export async function updateTeacherPayment(id: string, data: Partial<TeacherPayment>) {
+  const db = getDb();
   const docRef = doc(db, 'teacher_payments', id);
   await updateDoc(docRef, {
     ...data,
@@ -360,6 +386,7 @@ export async function updateTeacherPayment(id: string, data: Partial<TeacherPaym
 }
 
 export async function deleteTeacherPayment(id: string) {
+  const db = getDb();
   await deleteDoc(doc(db, 'teacher_payments', id));
 }
 
@@ -407,6 +434,7 @@ export async function checkAndManageLessonCycle(
   }
 
   // Buscar TODAS as aulas do aluno ordenadas por data
+  const db = getDb();
   const lessonsRef = collection(db, 'lessons');
   const q = query(
     lessonsRef,
@@ -519,6 +547,7 @@ export async function recalculateAllCycles(
   const student = await getStudent(studentId);
   if (!student || !student.contractedLessons) return;
 
+  const db = getDb();
   const lessonsRef = collection(db, 'lessons');
   const q = query(
     lessonsRef,
@@ -639,6 +668,7 @@ export interface TwilioConfig {
 }
 
 export async function getTwilioConfig(teacherId: string): Promise<TwilioConfig | null> {
+  const db = getDb();
   const docRef = doc(db, 'twilio_config', teacherId);
   const snapshot = await getDoc(docRef);
   if (!snapshot.exists()) return null;
@@ -651,6 +681,7 @@ export async function getTwilioConfig(teacherId: string): Promise<TwilioConfig |
 }
 
 export async function saveTwilioConfig(data: Omit<TwilioConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<TwilioConfig> {
+  const db = getDb();
   const docRef = doc(db, 'twilio_config', data.teacherId);
   await setDoc(docRef, {
     ...data,
@@ -665,6 +696,7 @@ export async function saveTwilioConfig(data: Omit<TwilioConfig, 'id' | 'createdA
 }
 
 export async function deleteTwilioConfig(teacherId: string): Promise<void> {
+  const db = getDb();
   await deleteDoc(doc(db, 'twilio_config', teacherId));
 }
 
@@ -686,6 +718,7 @@ export interface WhatsAppReminderLog {
 
 // Registrar envio de lembrete
 export async function logWhatsAppReminder(data: Omit<WhatsAppReminderLog, 'id' | 'sentAt'>): Promise<void> {
+  const db = getDb();
   await addDoc(collection(db, 'whatsapp_reminder_logs'), {
     ...data,
     sentAt: serverTimestamp(),
@@ -698,6 +731,7 @@ export async function hasReminderBeenSent(
   studentId: string, 
   referenceMonth: string
 ): Promise<boolean> {
+  const db = getDb();
   const logsRef = collection(db, 'whatsapp_reminder_logs');
   const q = query(
     logsRef,
@@ -714,6 +748,7 @@ export async function getWhatsAppReminderLogs(
   teacherId: string, 
   limit: number = 50
 ): Promise<WhatsAppReminderLog[]> {
+  const db = getDb();
   const logsRef = collection(db, 'whatsapp_reminder_logs');
   const q = query(
     logsRef,
