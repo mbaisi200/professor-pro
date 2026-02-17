@@ -13,6 +13,8 @@ import {
   Plus,
   Calendar,
   Loader2,
+  MessageSquare,
+  Send,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -217,6 +219,8 @@ export default function Dashboard() {
   const darkMode = JSON.parse(darkModeStorage);
   
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsappConfigured, setWhatsappConfigured] = useState(false);
 
   const { user, userData, loading: authLoading, isExpired } = useAuth();
   const queryClient = useQueryClient();
@@ -228,6 +232,16 @@ export default function Dashboard() {
     if (!userData) return null;
     return userData.id;
   }, [userData]);
+  
+  // Verificar se WhatsApp está configurado
+  useEffect(() => {
+    if (teacherId) {
+      fetch(`/api/twilio-config?teacherId=${teacherId}`)
+        .then(res => res.json())
+        .then(data => setWhatsappConfigured(!!data && data.enabled))
+        .catch(() => setWhatsappConfigured(false));
+    }
+  }, [teacherId]);
   
   // Limpar cache quando o usuário mudar para evitar dados de outras sessões
   useEffect(() => {
@@ -330,7 +344,9 @@ export default function Dashboard() {
       return !hasPaymentThisMonth;
     })
     .map(student => ({
+      studentId: student.id,
       studentName: student.name,
+      phone: student.phone,
       amount: student.monthlyFee!,
       dueDate: student.paymentDay!,
       // Atrasado se o dia atual já passou do dia de vencimento
@@ -342,6 +358,85 @@ export default function Dashboard() {
       if (!a.isOverdue && b.isOverdue) return 1;
       return a.dueDate - b.dueDate;
     });
+
+  // Função para enviar lembretes para todos os pendentes
+  const handleSendAllReminders = async () => {
+    if (!teacherId || !whatsappConfigured) {
+      router.push('/whatsapp');
+      return;
+    }
+
+    const alertsComTelefone = paymentAlerts.filter(a => a.phone);
+    if (alertsComTelefone.length === 0) {
+      alert('Nenhum aluno com telefone cadastrado');
+      return;
+    }
+
+    if (!confirm(`Enviar lembretes para ${alertsComTelefone.length} alunos?`)) {
+      return;
+    }
+
+    try {
+      setSendingWhatsApp(true);
+      const response = await fetch('/api/whatsapp', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`✅ ${data.totalSent} lembretes enviados com sucesso!\n❌ ${data.totalFailed} falhas.`);
+      } else {
+        alert('Erro: ' + data.error);
+      }
+    } catch (error: any) {
+      alert('Erro ao enviar lembretes: ' + error.message);
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
+
+  // Função para enviar lembrete individual
+  const handleSendSingleReminder = async (alert: typeof paymentAlerts[0]) => {
+    if (!teacherId || !whatsappConfigured) {
+      router.push('/whatsapp');
+      return;
+    }
+
+    if (!alert.phone) {
+      alert('Aluno não possui telefone cadastrado');
+      return;
+    }
+
+    try {
+      setSendingWhatsApp(true);
+      const response = await fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teacherId,
+          phone: alert.phone,
+          studentName: alert.studentName,
+          amount: alert.amount,
+          dueDate: alert.dueDate,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`✅ Lembrete enviado para ${alert.studentName}!`);
+      } else {
+        alert('Erro: ' + data.error);
+      }
+    } catch (error: any) {
+      alert('Erro ao enviar lembrete: ' + error.message);
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
 
   // A receber = total de mensalidades pendentes (baseado nos alertas)
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
@@ -567,14 +662,40 @@ export default function Dashboard() {
                 darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
               }`}
             >
-              <h2
-                className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
-                  darkMode ? 'text-white' : 'text-slate-800'
-                }`}
-              >
-                <AlertCircle className="w-5 h-5 text-amber-500" />
-                Alertas de Pagamento
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2
+                  className={`text-lg font-semibold flex items-center gap-2 ${
+                    darkMode ? 'text-white' : 'text-slate-800'
+                  }`}
+                >
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                  Alertas de Pagamento
+                  {paymentAlerts.length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-sm">
+                      {paymentAlerts.length}
+                    </span>
+                  )}
+                </h2>
+                {paymentAlerts.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant={whatsappConfigured ? "default" : "outline"}
+                    onClick={handleSendAllReminders}
+                    disabled={sendingWhatsApp}
+                    className={whatsappConfigured 
+                      ? "bg-green-600 hover:bg-green-700" 
+                      : "border-green-500 text-green-600 hover:bg-green-50"
+                    }
+                  >
+                    {sendingWhatsApp ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-1" />
+                    )}
+                    {whatsappConfigured ? 'Enviar Lembretes' : 'Configurar WhatsApp'}
+                  </Button>
+                )}
+              </div>
               {paymentAlerts.length === 0 ? (
                 <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Nenhum pagamento pendente
@@ -588,25 +709,46 @@ export default function Dashboard() {
                         darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
                       }`}
                     >
-                      <div>
+                      <div className="flex-1">
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                           {alert.studentName}
+                          {!alert.phone && (
+                            <span className="ml-2 text-xs text-slate-400">(sem telefone)</span>
+                          )}
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           Vencimento: dia {alert.dueDate}
                         </p>
                       </div>
-                      <span
-                        className={`px-2 py-1 rounded text-sm font-bold ${
-                          alert.isOverdue
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        R$ {alert.amount.toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-sm font-bold ${
+                            alert.isOverdue
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          R$ {alert.amount.toFixed(2)}
+                        </span>
+                        {alert.phone && whatsappConfigured && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSendSingleReminder(alert)}
+                            disabled={sendingWhatsApp}
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
+                  {paymentAlerts.length > 5 && (
+                    <p className={`text-sm text-center pt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      E mais {paymentAlerts.length - 5} pendente(s)...
+                    </p>
+                  )}
                 </div>
               )}
             </motion.div>

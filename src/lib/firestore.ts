@@ -618,3 +618,47 @@ export async function refreshAllCyclesForTeacher(teacherId: string): Promise<voi
   
   console.log('=== Cycle refresh complete ===');
 }
+
+// ============== TWILIO CONFIG ==============
+export interface TwilioConfig {
+  id?: string;
+  teacherId: string;
+  accountSid: string;
+  authToken: string;
+  phoneNumber: string; // Número do Twilio (formato: whatsapp:+14155238886)
+  reminderDays: number; // Dias antes do vencimento para enviar lembrete
+  reminderMessage: string; // Mensagem personalizada
+  enabled: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export async function getTwilioConfig(teacherId: string): Promise<TwilioConfig | null> {
+  const docRef = doc(db, 'twilio_config', teacherId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists()) return null;
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
+    createdAt: snapshot.data().createdAt?.toDate(),
+    updatedAt: snapshot.data().updatedAt?.toDate(),
+  } as TwilioConfig;
+}
+
+export async function saveTwilioConfig(data: Omit<TwilioConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<TwilioConfig> {
+  const docRef = doc(db, 'twilio_config', data.teacherId);
+  await setDoc(docRef, {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+  
+  return {
+    id: data.teacherId,
+    ...data,
+  } as TwilioConfig;
+}
+
+export async function deleteTwilioConfig(teacherId: string): Promise<void> {
+  await deleteDoc(doc(db, 'twilio_config', teacherId));
+}
