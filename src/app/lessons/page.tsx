@@ -1075,9 +1075,14 @@ export default function LessonsPage() {
                               </th>
                               <th 
                                 onClick={() => handleSort('status')}
-                                className={`text-left py-3 px-4 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                                className={`text-left py-3 px-3 text-xs font-semibold uppercase cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
                               >
                                 <div className="flex items-center">Status{getSortIcon('status')}</div>
+                              </th>
+                              <th 
+                                className={`text-left py-3 px-3 text-xs font-semibold uppercase ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                Conteúdo
                               </th>
                             </tr>
                           </thead>
@@ -1106,7 +1111,7 @@ export default function LessonsPage() {
                                 <td className={`py-2 px-4 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {lesson.subject || '-'}
                                 </td>
-                                <td className="py-2 px-4">
+                                <td className="py-2 px-3">
                                   {lesson.endOfCycle ? (
                                     <span className="px-2 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">
                                       🎯 FIM DO CICLO
@@ -1121,6 +1126,9 @@ export default function LessonsPage() {
                                       {statusLabels[lesson.status]}
                                     </span>
                                   )}
+                                </td>
+                                <td className={`py-2 px-3 text-sm max-w-[200px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} title={lesson.contentCovered || ''}>
+                                  {lesson.contentCovered || '-'}
                                 </td>
                               </tr>
                             ))}
@@ -1230,7 +1238,7 @@ export default function LessonsPage() {
 
                     {/* Lessons */}
                     <div className="px-1 pb-1 space-y-1">
-                      {dayLessons.slice(0, 3).map((lesson) => (
+                      {dayLessons.slice(0, 6).map((lesson) => (
                         <div
                           key={lesson.id}
                           onClick={(e) => handleLessonClick(lesson, e)}
@@ -1254,11 +1262,11 @@ export default function LessonsPage() {
                           )}
                         </div>
                       ))}
-                      {dayLessons.length > 3 && (
+                      {dayLessons.length > 6 && (
                         <div className={`text-xs p-1 text-center ${
                           darkMode ? 'text-slate-400' : 'text-slate-500'
                         }`}>
-                          +{dayLessons.length - 3} mais
+                          +{dayLessons.length - 6} mais
                         </div>
                       )}
                     </div>
