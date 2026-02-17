@@ -197,8 +197,7 @@ interface Payment {
 }
 
 export default function Dashboard() {
-  const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(format(today, 'yyyy-MM'));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('darkMode');
@@ -234,6 +233,12 @@ export default function Dashboard() {
       router.push('/login');
     }
   }, [user, authLoading, router]);
+
+  // Data atual fixa para evitar re-criação
+  const today = useMemo(() => new Date(), []);
+  const currentDay = today.getDate();
+  const currentMonth = format(today, 'yyyy-MM');
+  const formattedToday = format(today, "EEEE, dd 'de' MMMM", { locale: ptBR });
 
   // Se expirado, mostrar modal
   if (isExpired) {
@@ -300,39 +305,31 @@ export default function Dashboard() {
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
   // Alertas de Pagamento baseados no dia de vencimento do aluno
-  const paymentAlerts = useMemo(() => {
-    const alerts: { studentName: string; amount: number; dueDate: number; isOverdue: boolean }[] = [];
-    const currentDay = today.getDate();
-    const currentMonth = format(today, 'yyyy-MM');
-    
-    students
-      .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
-      .forEach(student => {
-        // Verificar se já existe pagamento para este aluno no mês atual
-        const hasPaymentThisMonth = payments.some(
-          p => p.studentId === student.id && 
-               p.referenceMonth === currentMonth && 
-               (p.status === 'paid' || p.status === 'pending')
-        );
-        
-        if (!hasPaymentThisMonth) {
-          const isOverdue = currentDay > (student.paymentDay || 0);
-          alerts.push({
-            studentName: student.name,
-            amount: student.monthlyFee!,
-            dueDate: student.paymentDay!,
-            isOverdue,
-          });
-        }
-      });
-    
-    // Ordenar: atrasados primeiro, depois por dia de vencimento
-    return alerts.sort((a, b) => {
+  // REGRA: Comparar dia atual com paymentDay do cadastro do aluno
+  const paymentAlerts = students
+    .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
+    .filter(student => {
+      // Verificar se já existe pagamento para este aluno no mês atual
+      const hasPaymentThisMonth = payments.some(
+        p => p.studentId === student.id && 
+             p.referenceMonth === currentMonth && 
+             (p.status === 'paid' || p.status === 'pending')
+      );
+      return !hasPaymentThisMonth;
+    })
+    .map(student => ({
+      studentName: student.name,
+      amount: student.monthlyFee!,
+      dueDate: student.paymentDay!,
+      // Atrasado se o dia atual já passou do dia de vencimento
+      isOverdue: currentDay > student.paymentDay!,
+    }))
+    .sort((a, b) => {
+      // Ordenar: atrasados primeiro, depois por dia de vencimento
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       return a.dueDate - b.dueDate;
     });
-  }, [students, payments, today]);
 
   // A receber = total de mensalidades pendentes (baseado nos alertas)
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
@@ -400,7 +397,7 @@ export default function Dashboard() {
                   Olá, Professor 👋
                 </h1>
                 <p className={`mt-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                  {format(today, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                  {formattedToday}
                 </p>
               </div>
               <div className="w-64">
