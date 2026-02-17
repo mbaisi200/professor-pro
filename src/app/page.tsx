@@ -171,6 +171,8 @@ interface Student {
   email?: string | null;
   phone?: string | null;
   monthlyFee?: number | null;
+  paymentDay?: number | null;
+  chargeFee?: boolean;
   status: string;
 }
 
@@ -187,6 +189,7 @@ interface Lesson {
 interface Payment {
   id: string;
   studentName?: string | null;
+  studentId?: string | null;
   amount: number;
   paymentDate?: string | null;
   status: string;
@@ -296,8 +299,43 @@ export default function Dashboard() {
     .filter((p) => p.referenceMonth === selectedMonth)
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  // A receber = esperado - recebido do mês de referência
-  const pendingAmount = Math.max(0, expectedMonthlyRevenue - monthlyIncome);
+  // Alertas de Pagamento baseados no dia de vencimento do aluno
+  const paymentAlerts = useMemo(() => {
+    const alerts: { studentName: string; amount: number; dueDate: number; isOverdue: boolean }[] = [];
+    const currentDay = today.getDate();
+    const currentMonth = format(today, 'yyyy-MM');
+    
+    students
+      .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
+      .forEach(student => {
+        // Verificar se já existe pagamento para este aluno no mês atual
+        const hasPaymentThisMonth = payments.some(
+          p => p.studentId === student.id && 
+               p.referenceMonth === currentMonth && 
+               (p.status === 'paid' || p.status === 'pending')
+        );
+        
+        if (!hasPaymentThisMonth) {
+          const isOverdue = currentDay > (student.paymentDay || 0);
+          alerts.push({
+            studentName: student.name,
+            amount: student.monthlyFee!,
+            dueDate: student.paymentDay!,
+            isOverdue,
+          });
+        }
+      });
+    
+    // Ordenar: atrasados primeiro, depois por dia de vencimento
+    return alerts.sort((a, b) => {
+      if (a.isOverdue && !b.isOverdue) return -1;
+      if (!a.isOverdue && b.isOverdue) return 1;
+      return a.dueDate - b.dueDate;
+    });
+  }, [students, payments, today]);
+
+  // A receber = total de mensalidades pendentes (baseado nos alertas)
+  const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
 
   // Aulas concluídas - IGNORA marcadores de final de ciclo
   const completedLessons = lessons
@@ -528,42 +566,38 @@ export default function Dashboard() {
                 <AlertCircle className="w-5 h-5 text-amber-500" />
                 Alertas de Pagamento
               </h2>
-              {payments.filter((p) => p.status === 'pending' || p.status === 'overdue').length ===
-              0 ? (
+              {paymentAlerts.length === 0 ? (
                 <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Nenhum pagamento pendente
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {payments
-                    .filter((p) => p.status === 'pending' || p.status === 'overdue')
-                    .slice(0, 5)
-                    .map((payment) => (
-                      <div
-                        key={payment.id}
-                        className={`flex items-center justify-between p-3 rounded-lg ${
-                          darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                  {paymentAlerts.slice(0, 5).map((alert, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                      }`}
+                    >
+                      <div>
+                        <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {alert.studentName}
+                        </p>
+                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Vencimento: dia {alert.dueDate}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-sm font-bold ${
+                          alert.isOverdue
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-100 text-amber-700'
                         }`}
                       >
-                        <div>
-                          <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            {payment.studentName || 'Aluno'}
-                          </p>
-                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {payment.referenceMonth || 'Sem referência'}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded text-sm font-bold ${
-                            payment.status === 'overdue'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          R$ {payment.amount?.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                        R$ {alert.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </motion.div>
