@@ -35,7 +35,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { teacherId, accountSid, authToken, phoneNumber, reminderDays, reminderMessage, enabled } = body;
+    const { 
+      teacherId, 
+      accountSid, 
+      authToken, 
+      phoneNumber, 
+      reminderDays, 
+      reminderMessage, 
+      enabled,
+      autoSendEnabled,
+      autoSendTime,
+      autoSendBeforeDue,
+      timezone
+    } = body;
 
     if (!teacherId || !accountSid || !authToken || !phoneNumber) {
       return NextResponse.json({ 
@@ -57,6 +69,10 @@ Vencimento: Dia {vencimento}
 
 Por favor, entre em contato para regularizar.`,
       enabled: enabled ?? true,
+      autoSendEnabled: autoSendEnabled ?? false,
+      autoSendTime: autoSendTime || '09:00',
+      autoSendBeforeDue: autoSendBeforeDue ?? 0,
+      timezone: timezone || 'America/Sao_Paulo',
     });
 
     return NextResponse.json({ 

@@ -629,6 +629,11 @@ export interface TwilioConfig {
   reminderDays: number; // Dias antes do vencimento para enviar lembrete
   reminderMessage: string; // Mensagem personalizada
   enabled: boolean;
+  // Novos campos para envio automático
+  autoSendEnabled: boolean; // Habilita envio automático
+  autoSendTime: string; // Horário do envio (formato: HH:mm, ex: "09:00")
+  autoSendBeforeDue: number; // Dias antes do vencimento para enviar (0 = no dia)
+  timezone: string; // Fuso horário (ex: "America/Sao_Paulo")
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -661,4 +666,74 @@ export async function saveTwilioConfig(data: Omit<TwilioConfig, 'id' | 'createdA
 
 export async function deleteTwilioConfig(teacherId: string): Promise<void> {
   await deleteDoc(doc(db, 'twilio_config', teacherId));
+}
+
+// ============== WHATSAPP REMINDER LOGS ==============
+export interface WhatsAppReminderLog {
+  id?: string;
+  teacherId: string;
+  studentId: string;
+  studentName: string;
+  phone: string;
+  amount: number;
+  dueDate: number;
+  sentAt: Date;
+  status: 'sent' | 'failed';
+  errorMessage?: string;
+  messageId?: string;
+  referenceMonth: string; // yyyy-MM do mês de referência
+}
+
+// Registrar envio de lembrete
+export async function logWhatsAppReminder(data: Omit<WhatsAppReminderLog, 'id' | 'sentAt'>): Promise<void> {
+  await addDoc(collection(db, 'whatsapp_reminder_logs'), {
+    ...data,
+    sentAt: serverTimestamp(),
+  });
+}
+
+// Verificar se já enviou lembrete para o aluno no mês
+export async function hasReminderBeenSent(
+  teacherId: string, 
+  studentId: string, 
+  referenceMonth: string
+): Promise<boolean> {
+  const logsRef = collection(db, 'whatsapp_reminder_logs');
+  const q = query(
+    logsRef,
+    where('teacherId', '==', teacherId),
+    where('studentId', '==', studentId),
+    where('referenceMonth', '==', referenceMonth)
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
+// Buscar logs de lembretes do professor
+export async function getWhatsAppReminderLogs(
+  teacherId: string, 
+  limit: number = 50
+): Promise<WhatsAppReminderLog[]> {
+  const logsRef = collection(db, 'whatsapp_reminder_logs');
+  const q = query(
+    logsRef,
+    where('teacherId', '==', teacherId),
+    // Ordenação e limite precisam de índice no Firestore
+  );
+  const snapshot = await getDocs(q);
+  
+  const logs = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    sentAt: doc.data().sentAt?.toDate(),
+  })) as WhatsAppReminderLog[];
+  
+  // Ordenar por data no cliente
+  return logs
+    .sort((a, b) => {
+      const aTime = a.sentAt?.getTime() || 0;
+      const bTime = b.sentAt?.getTime() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit);
 }

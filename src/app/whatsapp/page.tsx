@@ -14,6 +14,9 @@ import {
   Trash2,
   TestTube,
   HelpCircle,
+  Clock,
+  Bell,
+  Play,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +27,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface TwilioConfig {
@@ -35,6 +45,10 @@ interface TwilioConfig {
   reminderDays: number;
   reminderMessage: string;
   enabled: boolean;
+  autoSendEnabled: boolean;
+  autoSendTime: string;
+  autoSendBeforeDue: number;
+  timezone: string;
 }
 
 const DEFAULT_MESSAGE = `Olá! Este é um lembrete de pagamento da mensalidade.
@@ -45,11 +59,21 @@ Vencimento: Dia {vencimento}
 
 Por favor, entre em contato para regularizar.`;
 
+const TIMEZONES = [
+  { value: 'America/Sao_Paulo', label: 'Brasília (GMT-3)' },
+  { value: 'America/Manaus', label: 'Manaus (GMT-4)' },
+  { value: 'America/Fortaleza', label: 'Fortaleza (GMT-3)' },
+  { value: 'America/Recife', label: 'Recife (GMT-3)' },
+  { value: 'America/Bahia', label: 'Bahia (GMT-3)' },
+  { value: 'America/Belem', label: 'Belém (GMT-3)' },
+];
+
 export default function WhatsAppSettingsPage() {
   const { user, userData } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [runningCron, setRunningCron] = useState(false);
   const [config, setConfig] = useState<TwilioConfig | null>(null);
   
   // Form state
@@ -59,6 +83,12 @@ export default function WhatsAppSettingsPage() {
   const [reminderDays, setReminderDays] = useState(3);
   const [reminderMessage, setReminderMessage] = useState(DEFAULT_MESSAGE);
   const [enabled, setEnabled] = useState(true);
+  
+  // Auto send state
+  const [autoSendEnabled, setAutoSendEnabled] = useState(false);
+  const [autoSendTime, setAutoSendTime] = useState('09:00');
+  const [autoSendBeforeDue, setAutoSendBeforeDue] = useState(0);
+  const [timezone, setTimezone] = useState('America/Sao_Paulo');
   
   // Test message
   const [testPhone, setTestPhone] = useState('');
@@ -86,6 +116,10 @@ export default function WhatsAppSettingsPage() {
         setReminderDays(data.reminderDays || 3);
         setReminderMessage(data.reminderMessage || DEFAULT_MESSAGE);
         setEnabled(data.enabled ?? true);
+        setAutoSendEnabled(data.autoSendEnabled ?? false);
+        setAutoSendTime(data.autoSendTime || '09:00');
+        setAutoSendBeforeDue(data.autoSendBeforeDue ?? 0);
+        setTimezone(data.timezone || 'America/Sao_Paulo');
       }
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
@@ -116,6 +150,10 @@ export default function WhatsAppSettingsPage() {
         reminderDays,
         reminderMessage,
         enabled,
+        autoSendEnabled,
+        autoSendTime,
+        autoSendBeforeDue,
+        timezone,
       };
       
       // Só enviar authToken se foi preenchido (novo ou atualização)
@@ -182,6 +220,34 @@ export default function WhatsAppSettingsPage() {
     }
   };
 
+  const handleRunCron = async () => {
+    if (!confirm('Executar verificação de lembretes agora? Isso enviará mensagens para os alunos elegíveis.')) {
+      return;
+    }
+
+    try {
+      setRunningCron(true);
+      
+      const response = await fetch('/api/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Processado! Enviados: ${data.sent}, Falhas: ${data.failed}, Ignorados: ${data.skipped}`);
+      } else {
+        toast.error(data.error || data.message || 'Erro ao executar verificação');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao executar verificação');
+    } finally {
+      setRunningCron(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Tem certeza que deseja excluir a configuração do WhatsApp?')) {
       return;
@@ -203,6 +269,9 @@ export default function WhatsAppSettingsPage() {
         setReminderDays(3);
         setReminderMessage(DEFAULT_MESSAGE);
         setEnabled(true);
+        setAutoSendEnabled(false);
+        setAutoSendTime('09:00');
+        setAutoSendBeforeDue(0);
       } else {
         toast.error(data.error || 'Erro ao excluir configuração');
       }
@@ -341,6 +410,104 @@ export default function WhatsAppSettingsPage() {
                 </CardContent>
               </Card>
 
+              {/* Auto Send Card */}
+              <Card className="border-green-200 bg-green-50/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-green-600" />
+                    Envio Automático
+                  </CardTitle>
+                  <CardDescription>
+                    Configure o envio automático de lembretes baseado na data de vencimento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-white border border-green-200">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={autoSendEnabled}
+                        onCheckedChange={setAutoSendEnabled}
+                      />
+                      <div>
+                        <Label className="font-medium">Habilitar envio automático</Label>
+                        <p className="text-xs text-slate-500">
+                          Envia lembretes automaticamente no dia configurado
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {autoSendEnabled && (
+                    <div className="grid md:grid-cols-3 gap-4 p-4 rounded-lg bg-white border border-green-200">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          Dias antes do vencimento
+                        </Label>
+                        <Select 
+                          value={autoSendBeforeDue.toString()} 
+                          onValueChange={(v) => setAutoSendBeforeDue(parseInt(v))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">No dia do vencimento</SelectItem>
+                            <SelectItem value="1">1 dia antes</SelectItem>
+                            <SelectItem value="2">2 dias antes</SelectItem>
+                            <SelectItem value="3">3 dias antes</SelectItem>
+                            <SelectItem value="5">5 dias antes</SelectItem>
+                            <SelectItem value="7">1 semana antes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Horário de envio</Label>
+                        <Input
+                          type="time"
+                          value={autoSendTime}
+                          onChange={(e) => setAutoSendTime(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fuso horário</Label>
+                        <Select value={timezone} onValueChange={setTimezone}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleRunCron}
+                      disabled={runningCron || !config}
+                      className="border-green-500 text-green-600 hover:bg-green-50"
+                    >
+                      {runningCron ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4 mr-1" />
+                      )}
+                      Executar Agora
+                    </Button>
+                    <p className="text-xs text-slate-500">
+                      O envio automático roda diariamente às 09:00 (horário de Brasília)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Message Template Card */}
               <Card>
                 <CardHeader>
@@ -350,18 +517,6 @@ export default function WhatsAppSettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reminderDays">Dias antes do vencimento para enviar</Label>
-                    <Input
-                      id="reminderDays"
-                      type="number"
-                      min={0}
-                      max={10}
-                      value={reminderDays}
-                      onChange={(e) => setReminderDays(parseInt(e.target.value) || 0)}
-                      className="w-32"
-                    />
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="reminderMessage">Mensagem de Lembrete</Label>
                     <Textarea
