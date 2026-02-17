@@ -55,6 +55,9 @@ interface Student {
   name: string;
   status: string;
   teacherId?: string | null;
+  monthlyFee?: number | null;
+  paymentDay?: number | null;
+  chargeFee?: boolean;
 }
 
 // Payment Form Modal
@@ -245,8 +248,8 @@ export default function FinancePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<'paymentDate' | 'studentName' | 'amount' | 'status' | 'referenceMonth'>('paymentDate');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState<'paymentDate' | 'studentName' | 'amount' | 'status' | 'referenceMonth' | 'dueDate'>('dueDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -274,8 +277,40 @@ export default function FinancePage() {
       ]);
 
       if (userData?.id) {
-        setPayments(paymentsData.filter(p => p.teacherId === userData.id));
-        setStudents(studentsData.filter(s => s.teacherId === userData.id));
+        const teacherPayments = paymentsData.filter(p => p.teacherId === userData.id);
+        const teacherStudents = studentsData.filter(s => s.teacherId === userData.id);
+        
+        // Gerar pagamentos pendentes automáticos para alunos ativos com mensalidade
+        const currentMonth = format(new Date(), 'yyyy-MM');
+        const pendingPaymentsGenerated: Payment[] = [];
+        
+        teacherStudents
+          .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
+          .forEach(student => {
+            // Verificar se já existe pagamento para este aluno no mês atual
+            const existingPayment = teacherPayments.find(
+              p => p.studentId === student.id && p.referenceMonth === currentMonth
+            );
+            
+            if (!existingPayment) {
+              // Criar pagamento pendente virtual
+              const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), student.paymentDay!);
+              pendingPaymentsGenerated.push({
+                id: `pending-${student.id}-${currentMonth}`,
+                studentName: student.name,
+                studentId: student.id,
+                amount: student.monthlyFee!,
+                paymentDate: null,
+                dueDate: format(dueDate, 'yyyy-MM-dd'),
+                status: isPast(dueDate) && !isToday(dueDate) ? 'overdue' : 'pending',
+                referenceMonth: currentMonth,
+                teacherId: userData.id,
+              });
+            }
+          });
+        
+        setPayments([...teacherPayments, ...pendingPaymentsGenerated]);
+        setStudents(teacherStudents);
       } else {
         setPayments([]);
         setStudents([]);
@@ -322,6 +357,13 @@ export default function FinancePage() {
   };
 
   const handleDelete = async (id: string) => {
+    // Verificar se é um pagamento virtual (pendente gerado automaticamente)
+    if (id.startsWith('pending-')) {
+      toast({ title: 'Pagamento pendente removido da lista!', description: 'O aluno não terá mensalidade gerada automaticamente.' });
+      fetchData();
+      return;
+    }
+    
     if (!confirm('Deseja realmente excluir este pagamento?')) return;
     try {
       await firestoreService.delete(COLLECTIONS.PAYMENTS, id);
@@ -335,10 +377,24 @@ export default function FinancePage() {
 
   const handleMarkAsPaid = async (payment: Payment) => {
     try {
-      await firestoreService.update(COLLECTIONS.PAYMENTS, payment.id, {
-        status: 'paid',
-        paymentDate: format(new Date(), 'yyyy-MM-dd'),
-      });
+      // Se for um pagamento virtual (pendente gerado automaticamente), criar no banco
+      if (payment.id.startsWith('pending-')) {
+        await firestoreService.create(COLLECTIONS.PAYMENTS, {
+          studentName: payment.studentName,
+          studentId: payment.studentId,
+          amount: payment.amount,
+          paymentDate: format(new Date(), 'yyyy-MM-dd'),
+          dueDate: payment.dueDate,
+          status: 'paid',
+          referenceMonth: payment.referenceMonth,
+          teacherId: userData?.id || null,
+        });
+      } else {
+        await firestoreService.update(COLLECTIONS.PAYMENTS, payment.id, {
+          status: 'paid',
+          paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        });
+      }
       toast({ title: 'Pagamento confirmado!' });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       fetchData();
@@ -353,7 +409,7 @@ export default function FinancePage() {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection(field === 'paymentDate' ? 'desc' : 'asc');
+      setSortDirection(field === 'paymentDate' || field === 'dueDate' ? 'asc' : 'asc');
     }
   };
 
@@ -394,6 +450,13 @@ export default function FinancePage() {
         case 'referenceMonth':
           valueA = a.referenceMonth || '';
           valueB = b.referenceMonth || '';
+          break;
+        case 'dueDate':
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          valueA = new Date(a.dueDate).getTime();
+          valueB = new Date(b.dueDate).getTime();
           break;
         default:
           valueA = 0;
@@ -590,13 +653,24 @@ export default function FinancePage() {
                     </th>
                     <th 
                       onClick={() => handleSort('status')}
-                      className={`text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                      className={`text-left px-3 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
                         darkMode ? 'text-slate-300' : 'text-slate-500'
                       }`}
                     >
                       <div className="flex items-center">
                         Status
                         <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('dueDate')}
+                      className={`text-left px-3 py-3 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors select-none ${
+                        darkMode ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        Vencimento
+                        <SortIcon field="dueDate" sortField={sortField} sortDirection={sortDirection} />
                       </div>
                     </th>
                     <th className={`text-right px-4 py-3 text-xs font-semibold uppercase tracking-wider ${
@@ -609,7 +683,7 @@ export default function FinancePage() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {filteredPayments.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12">
+                      <td colSpan={7} className="text-center py-12">
                         <Receipt className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
                         <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Nenhum pagamento encontrado</p>
                       </td>
@@ -653,6 +727,14 @@ export default function FinancePage() {
                             <Badge className={statusColors[displayStatus]}>
                               {statusLabels[displayStatus]}
                             </Badge>
+                          </td>
+                          <td className={`px-3 py-3 font-medium ${
+                            displayStatus === 'overdue' ? 'text-rose-600' :
+                            darkMode ? 'text-slate-300' : 'text-slate-600'
+                          }`}>
+                            {payment.dueDate
+                              ? format(parseISO(payment.dueDate), 'dd/MM/yyyy')
+                              : '-'}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
