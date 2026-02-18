@@ -1,8 +1,5 @@
 // This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// learn more about it in the docs: https://pris.ly/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -14,19 +11,101 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          String    // "admin" ou "teacher"
+  phone         String?
+  active        Boolean   @default(true)
+  
+  // Twilio config por usuário (cada professor tem seu próprio)
+  twilioAccountSid  String?
+  twilioAuthToken    String?
+  twilioPhoneNumber  String?
+  whatsappEnabled    Boolean @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  students      Student[]
+  classes       Class[]
+  payments      Payment[]
 }
 
-model Post {
+model Student {
+  id                String    @id @default(cuid())
+  name              String    // Aceita qualquer case
+  email             String?
+  phone             String
+  responsibleName   String?   // Nome do responsável
+  responsiblePhone  String?   // Telefone do responsável para WhatsApp
+  notes             String?
+  active            Boolean   @default(true)
+  
+  teacherId         String
+  teacher           User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  classes           ClassStudent[]
+  payments          Payment[]
+}
+
+model Class {
+  id            String    @id @default(cuid())
+  title         String    // Aceita qualquer case
+  description   String?
+  dayOfWeek     Int       // 0-6 (Domingo-Sábado)
+  startTime     String    // "09:00"
+  endTime       String    // "10:00"
+  price         Float     @default(0)
+  active        Boolean   @default(true)
+  
+  teacherId     String
+  teacher       User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  students      ClassStudent[]
+  payments      Payment[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ClassStudent {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@unique([classId, studentId])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  status        String    // "pending", "paid", "overdue"
+  paymentMethod String?   // "cash", "pix", "credit", "debit"
+  notes         String?
+  reminderSent  Boolean   @default(false)
+  
+  studentId     String
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  classId       String?
+  class         Class?    @relation(fields: [classId], references: [id])
+  
+  teacherId     String
+  teacher       User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
