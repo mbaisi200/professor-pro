@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AppLayout from '@/components/layout/AppLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -74,7 +74,7 @@ const paymentMethods = [
   { value: 'debit', label: 'Cartão de Débito' },
 ]
 
-export default function PaymentsPage() {
+function PaymentsContent() {
   const searchParams = useSearchParams()
   const [payments, setPayments] = useState<Payment[]>([])
   const [students, setStudents] = useState<Student[]>([])
@@ -470,5 +470,19 @@ export default function PaymentsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
+  )
+}
+
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      </AppLayout>
+    }>
+      <PaymentsContent />
+    </Suspense>
   )
 }

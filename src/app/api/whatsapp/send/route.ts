@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createTwilioClient, formatPhoneNumber } from '@/lib/twilio'
+import { getUserTwilioConfig, sendWhatsAppMessage } from '@/lib/twilio'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,11 +11,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
     
-    if (!user.whatsappEnabled || !user.twilioAccountSid || !user.twilioAuthToken || !user.twilioPhoneNumber) {
+    const twilioConfig = getUserTwilioConfig(user)
+    
+    if (!twilioConfig || !user.whatsappEnabled) {
       return NextResponse.json({ 
         success: false, 
         error: 'WhatsApp não configurado ou desabilitado' 
-      })
+      }, { status: 400 })
     }
     
     const body = await request.json()
@@ -25,17 +27,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         success: false, 
         error: 'Telefone e mensagem são obrigatórios' 
-      })
+      }, { status: 400 })
     }
     
-    const twilio = createTwilioClient({
-      accountSid: user.twilioAccountSid,
-      authToken: user.twilioAuthToken,
-      phoneNumber: user.twilioPhoneNumber,
-    })
-    
-    const formattedPhone = formatPhoneNumber(phone)
-    const result = await twilio.sendWhatsAppMessage(formattedPhone, message)
+    const result = await sendWhatsAppMessage(twilioConfig, phone, message)
     
     if (result.success && paymentId) {
       // Mark reminder as sent
