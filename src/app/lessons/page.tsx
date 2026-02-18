@@ -36,6 +36,8 @@ import {
   addMonths,
   subMonths,
   parseISO,
+  isBefore,
+  startOfDay,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -112,6 +114,9 @@ function LessonForm({
     status: lesson?.status || 'scheduled',
   });
 
+  // Data mínima para agendamento (hoje)
+  const minDate = format(new Date(), 'yyyy-MM-dd');
+
   const handleStudentChange = (studentId: string) => {
     const student = students.find((s) => s.id === studentId);
     setForm({
@@ -124,6 +129,16 @@ function LessonForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar se a data é anterior à data atual (apenas para novas aulas)
+    const selectedDate = parseISO(form.date);
+    const today = startOfDay(new Date());
+    
+    if (!lesson && isBefore(selectedDate, today)) {
+      alert('Não é possível agendar aulas com datas anteriores à atual.');
+      return;
+    }
+    
     onSave(form);
   };
 
@@ -166,6 +181,7 @@ function LessonForm({
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
+                min={lesson ? undefined : minDate}
                 required
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
