@@ -1100,6 +1100,11 @@ export default function LessonsPage() {
                               >
                                 Conteúdo
                               </th>
+                              <th 
+                                className={`text-center py-3 px-3 text-xs font-semibold uppercase ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+                              >
+                                Ações
+                              </th>
                             </tr>
                           </thead>
                           <tbody className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
@@ -1145,6 +1150,31 @@ export default function LessonsPage() {
                                 </td>
                                 <td className={`py-2 px-3 text-sm max-w-[200px] whitespace-normal break-words ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {lesson.contentCovered || '-'}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setEditingLesson(lesson);
+                                        setShowForm(true);
+                                      }}
+                                      className={`h-8 w-8 ${darkMode ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/30' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'}`}
+                                      title="Editar aula"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDelete(lesson)}
+                                      className={`h-8 w-8 ${darkMode ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-900/30' : 'text-rose-600 hover:text-rose-700 hover:bg-rose-50'}`}
+                                      title="Excluir aula"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
