@@ -19,7 +19,6 @@ import {
   Shield,
   Wifi,
   WifiOff,
-  MessageSquare,
 } from 'lucide-react';
 import { doc, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,6 @@ const navigation = [
   { name: 'Alunos', href: '/students', icon: Users },
   { name: 'Aulas', href: '/lessons', icon: Calendar },
   { name: 'Financeiro', href: '/finance', icon: DollarSign },
-  { name: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
 ];
 
 const adminNavigation = [

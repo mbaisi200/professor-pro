@@ -13,8 +13,6 @@ import {
   Plus,
   Calendar,
   Loader2,
-  MessageSquare,
-  Send,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -167,41 +165,8 @@ function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
   );
 }
 
-interface Student {
-  id: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  monthlyFee?: number | null;
-  paymentDay?: number | null;
-  chargeFee?: boolean;
-  status: string;
-}
-
-interface Lesson {
-  id: string;
-  date: string;
-  startTime?: string | null;
-  studentName?: string | null;
-  subject?: string | null;
-  status: string;
-  endOfCycle?: boolean;
-}
-
-interface Payment {
-  id: string;
-  studentName?: string | null;
-  studentId?: string | null;
-  amount: number;
-  paymentDate?: string | null;
-  status: string;
-  referenceMonth?: string | null;
-}
-
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
-  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
-  const [whatsappConfigured, setWhatsappConfigured] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
@@ -222,16 +187,6 @@ export default function Dashboard() {
     if (!userData) return null;
     return userData.id;
   }, [userData]);
-  
-  // Verificar se WhatsApp está configurado
-  useEffect(() => {
-    if (teacherId) {
-      fetch(`/api/twilio-config?teacherId=${teacherId}`)
-        .then(res => res.json())
-        .then(data => setWhatsappConfigured(!!data && data.enabled))
-        .catch(() => setWhatsappConfigured(false));
-    }
-  }, [teacherId]);
   
   // Limpar cache quando o usuário mudar para evitar dados de outras sessões
   useEffect(() => {
@@ -358,85 +313,6 @@ export default function Dashboard() {
       return a.dueDate - b.dueDate;
     });
 
-  // Função para enviar lembretes para todos os pendentes
-  const handleSendAllReminders = async () => {
-    if (!teacherId || !whatsappConfigured) {
-      router.push('/whatsapp');
-      return;
-    }
-
-    const alertsComTelefone = paymentAlerts.filter(a => a.phone);
-    if (alertsComTelefone.length === 0) {
-      alert('Nenhum aluno com telefone cadastrado');
-      return;
-    }
-
-    if (!confirm(`Enviar lembretes para ${alertsComTelefone.length} alunos?`)) {
-      return;
-    }
-
-    try {
-      setSendingWhatsApp(true);
-      const response = await fetch('/api/whatsapp', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert(`✅ ${data.totalSent} lembretes enviados com sucesso!\n❌ ${data.totalFailed} falhas.`);
-      } else {
-        alert('Erro: ' + data.error);
-      }
-    } catch (error: any) {
-      alert('Erro ao enviar lembretes: ' + error.message);
-    } finally {
-      setSendingWhatsApp(false);
-    }
-  };
-
-  // Função para enviar lembrete individual
-  const handleSendSingleReminder = async (alert: typeof paymentAlerts[0]) => {
-    if (!teacherId || !whatsappConfigured) {
-      router.push('/whatsapp');
-      return;
-    }
-
-    if (!alert.phone) {
-      alert('Aluno não possui telefone cadastrado');
-      return;
-    }
-
-    try {
-      setSendingWhatsApp(true);
-      const response = await fetch('/api/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherId,
-          phone: alert.phone,
-          studentName: alert.studentName,
-          amount: alert.amount,
-          dueDate: alert.dueDate,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert(`✅ Lembrete enviado para ${alert.studentName}!`);
-      } else {
-        alert('Erro: ' + data.error);
-      }
-    } catch (error: any) {
-      alert('Erro ao enviar lembrete: ' + error.message);
-    } finally {
-      setSendingWhatsApp(false);
-    }
-  };
-
   // A receber = total de mensalidades pendentes (baseado nos alertas)
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
 
@@ -448,155 +324,96 @@ export default function Dashboard() {
       return lessonDate >= monthStart && lessonDate <= monthEnd;
     }).length;
 
-  // Generate month options
-  const monthOptions = [];
-  for (let i = -12; i <= 3; i++) {
-    const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-    monthOptions.push({
-      value: format(date, 'yyyy-MM'),
-      label: format(date, "MMMM 'de' yyyy", { locale: ptBR }),
-    });
-  }
-
-  // Show skeleton while loading data
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
-          <LoadingSkeleton darkMode={darkMode} />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  // Error state
-  if (isError) {
-    return (
-      <AppLayout>
-        <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
-          <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-            <h2 className={`text-xl font-semibold mt-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Erro ao carregar dados</h2>
-            <p className={`mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Verifique sua conexão e tente novamente</p>
-            <Button onClick={() => refetch()} className="mt-4">
-              Tentar novamente
-            </Button>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  if (isLoading) return <LoadingSkeleton darkMode={darkMode} />;
 
   return (
     <AppLayout>
-      <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
+      <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1
-                  className={`text-3xl font-bold tracking-tight ${
-                    darkMode ? 'text-white' : 'text-slate-800'
-                  }`}
-                >
-                  Olá, Professor 👋
-                </h1>
-                <p className={`mt-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                  {formattedToday}
-                </p>
-              </div>
-              <div className="w-64">
-                <label className={`text-xs mb-1 block ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Período
-                </label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger
-                    className={darkMode ? 'bg-slate-800 text-white border-slate-700' : ''}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+          >
+            <div>
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                Olá, {userData?.name || 'Professor'}! 👋
+              </h1>
+              <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                {formattedToday} • Resumo do seu desempenho
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className={`w-[180px] ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white'}`}>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Selecione o mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                    const value = format(date, 'yyyy-MM');
+                    const label = format(date, "MMMM 'de' yyyy", { locale: ptBR });
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {label}
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => refetch()} variant="outline" size="icon" className={darkMode ? 'border-slate-700 text-white' : ''}>
+                <TrendingUp className="w-4 h-4" />
+              </Button>
             </div>
           </motion.div>
 
-          {/* Stats */}
+          {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <StatsCard
               title="Alunos Ativos"
               value={activeStudents}
-              subtitle={`${students.length} total`}
+              subtitle="Total de alunos"
               icon={Users}
               color="blue"
               darkMode={darkMode}
             />
             <StatsCard
-              title="Aulas Realizadas"
+              title="Aulas no Mês"
               value={completedLessons}
-              subtitle="No período"
+              subtitle="Aulas concluídas"
               icon={BookOpen}
               color="purple"
               darkMode={darkMode}
             />
             <StatsCard
-              title="Receita Esperada"
-              value={`R$ ${expectedMonthlyRevenue.toFixed(2)}`}
-              subtitle="Mensalidades"
-              icon={Wallet}
-              color="indigo"
-              darkMode={darkMode}
-            />
-            <StatsCard
-              title="Receita Recebida"
+              title="Receita do Mês"
               value={`R$ ${monthlyIncome.toFixed(2)}`}
-              subtitle="No período"
-              icon={TrendingUp}
+              subtitle="Total recebido"
+              icon={DollarSign}
               color="green"
               darkMode={darkMode}
             />
             <StatsCard
               title="A Receber"
               value={`R$ ${pendingAmount.toFixed(2)}`}
-              subtitle="Pendente"
-              icon={AlertCircle}
+              subtitle="Mensalidades pendentes"
+              icon={Wallet}
               color="amber"
+              darkMode={darkMode}
+            />
+            <StatsCard
+              title="Previsão Total"
+              value={`R$ ${expectedMonthlyRevenue.toFixed(2)}`}
+              subtitle="Faturamento esperado"
+              icon={TrendingUp}
+              color="indigo"
               darkMode={darkMode}
             />
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            <Button
-              onClick={() => router.push('/students')}
-              className={darkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-800 hover:bg-slate-700'}
-            >
-              <Plus className="w-4 h-4 mr-2" /> Novo Aluno
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/lessons')}
-              className={darkMode ? 'border-slate-700 text-white hover:bg-slate-800' : ''}
-            >
-              <BookOpen className="w-4 h-4 mr-2" /> Agendar Aula
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/finance')}
-              className={darkMode ? 'border-slate-700 text-white hover:bg-slate-800' : ''}
-            >
-              <DollarSign className="w-4 h-4 mr-2" /> Registrar Pagamento
-            </Button>
-          </div>
-
-          {/* Main Content */}
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Upcoming Lessons */}
             <motion.div
@@ -607,18 +424,36 @@ export default function Dashboard() {
                 darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
               }`}
             >
-              <h2
-                className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
-                  darkMode ? 'text-white' : 'text-slate-800'
-                }`}
-              >
-                <Calendar className="w-5 h-5 text-blue-500" />
-                Próximas Aulas
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2
+                  className={`text-lg font-semibold flex items-center gap-2 ${
+                    darkMode ? 'text-white' : 'text-slate-800'
+                  }`}
+                >
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                  Próximas Aulas
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push('/lessons')}
+                  className={darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600'}
+                >
+                  Ver todas
+                </Button>
+              </div>
+
               {upcomingLessons.length === 0 ? (
-                <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Nenhuma aula agendada para os próximos 7 dias
-                </p>
+                <div className="text-center py-8">
+                  <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Nenhuma aula agendada para os próximos 7 dias</p>
+                  <Button
+                    variant="outline"
+                    className={`mt-4 ${darkMode ? 'border-slate-700 text-white' : ''}`}
+                    onClick={() => router.push('/lessons')}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Agendar Aula
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {upcomingLessons.slice(0, 5).map((lesson) => (
@@ -630,21 +465,15 @@ export default function Dashboard() {
                     >
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                          {lesson.studentName || 'Aluno'}
+                          {lesson.studentName}
                         </p>
                         <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {format(parseISO(lesson.date), "EEEE, dd/MM", { locale: ptBR })} às{' '}
-                          {lesson.startTime || '--:--'}
+                          {format(parseISO(lesson.date), "dd 'de' MMMM", { locale: ptBR })} •{' '}
+                          {lesson.startTime}
                         </p>
                       </div>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          lesson.subject
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {lesson.subject || 'Geral'}
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                        {lesson.subject}
                       </span>
                     </div>
                   ))}
@@ -675,25 +504,6 @@ export default function Dashboard() {
                     </span>
                   )}
                 </h2>
-                {paymentAlerts.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant={whatsappConfigured ? "default" : "outline"}
-                    onClick={handleSendAllReminders}
-                    disabled={sendingWhatsApp}
-                    className={whatsappConfigured 
-                      ? "bg-green-600 hover:bg-green-700" 
-                      : "border-green-500 text-green-600 hover:bg-green-50"
-                    }
-                  >
-                    {sendingWhatsApp ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-1" />
-                    )}
-                    {whatsappConfigured ? 'Enviar Lembretes' : 'Configurar WhatsApp'}
-                  </Button>
-                )}
               </div>
               {paymentAlerts.length === 0 ? (
                 <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -729,17 +539,6 @@ export default function Dashboard() {
                         >
                           R$ {alert.amount.toFixed(2)}
                         </span>
-                        {alert.phone && whatsappConfigured && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleSendSingleReminder(alert)}
-                            disabled={sendingWhatsApp}
-                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                     </div>
                   ))}
