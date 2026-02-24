@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock } from 'lucide-react';
+
+// Deep Purple theme color
+const DEEP_PURPLE = '#844FC1';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -182,11 +185,14 @@ function StudentForm({
             </label>
             <Input
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Nome do aluno"
+              onChange={(e) => setForm({ ...form, name: e.target.value.toUpperCase() })}
+              placeholder="NOME DO ALUNO"
               required
-              className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+              className={`mt-1 uppercase ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
             />
+            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              * Obrigatório - convertido para maiúsculas automaticamente
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -223,9 +229,9 @@ function StudentForm({
               </label>
               <Input
                 value={form.guardianName}
-                onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
-                placeholder="Nome do responsável"
-                className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                onChange={(e) => setForm({ ...form, guardianName: e.target.value.toUpperCase() })}
+                placeholder="NOME DO RESPONSÁVEL"
+                className={`mt-1 uppercase ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
             <div>
@@ -249,9 +255,9 @@ function StudentForm({
               </label>
               <Input
                 value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                placeholder="Ex: Matemática"
-                className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                onChange={(e) => setForm({ ...form, subject: e.target.value.toUpperCase() })}
+                placeholder="EX: MATEMÁTICA"
+                className={`mt-1 uppercase ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
             <div>
@@ -260,9 +266,9 @@ function StudentForm({
               </label>
               <Input
                 value={form.turma}
-                onChange={(e) => setForm({ ...form, turma: e.target.value })}
-                placeholder="Ex: 3º A"
-                className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                onChange={(e) => setForm({ ...form, turma: e.target.value.toUpperCase() })}
+                placeholder="EX: 3º A"
+                className={`mt-1 uppercase ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
           </div>
@@ -410,7 +416,8 @@ function StudentForm({
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1 bg-slate-800 hover:bg-slate-700"
+              className="flex-1 hover:opacity-90"
+              style={{ backgroundColor: DEEP_PURPLE }}
             >
               {isLoading ? 'Salvando...' : 'Salvar'}
             </Button>
@@ -586,7 +593,8 @@ export default function StudentsPage() {
                 setEditingStudent(null);
                 setShowForm(true);
               }}
-              className="bg-slate-800 hover:bg-slate-700"
+              className="hover:opacity-90"
+              style={{ backgroundColor: DEEP_PURPLE }}
             >
               <Plus className="w-4 h-4 mr-2" /> Novo Aluno
             </Button>
@@ -641,7 +649,8 @@ export default function StudentsPage() {
               {!search && statusFilter === 'all' && (
                 <Button
                   onClick={() => setShowForm(true)}
-                  className="bg-slate-800 hover:bg-slate-700"
+                  className="hover:opacity-90"
+                  style={{ backgroundColor: DEEP_PURPLE }}
                 >
                   <Plus className="w-4 h-4 mr-2" /> Cadastrar Aluno
                 </Button>

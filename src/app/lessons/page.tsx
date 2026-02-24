@@ -69,7 +69,7 @@ interface Student {
   teacherId?: string | null;
 }
 
-// Status colors - cores sólidas para o calendário
+// Status colors - cores sólidas para o calendário com Deep Purple
 const statusColors: Record<string, string> = {
   scheduled: 'bg-blue-500',
   completed: 'bg-emerald-500',
@@ -77,6 +77,9 @@ const statusColors: Record<string, string> = {
   rescheduled: 'bg-amber-500',
   cycle_end: 'bg-purple-500',
 };
+
+// Deep Purple theme color
+const DEEP_PURPLE = '#844FC1';
 
 const statusLabels: Record<string, string> = {
   scheduled: 'Agendada',
@@ -226,14 +229,18 @@ function LessonForm({
 
           <div>
             <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Matéria
+              Matéria *
             </label>
             <Input
               value={form.subject}
-              onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              placeholder="Ex: Matemática"
-              className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+              onChange={(e) => setForm({ ...form, subject: e.target.value.toUpperCase() })}
+              placeholder="EX: MATEMÁTICA"
+              required
+              className={`mt-1 uppercase ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
             />
+            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              * Obrigatório - convertido para maiúsculas automaticamente
+            </p>
           </div>
 
           <div>
@@ -277,7 +284,7 @@ function LessonForm({
             <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading} className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button type="submit" disabled={isLoading} className="flex-1 hover:opacity-90" style={{ backgroundColor: DEEP_PURPLE }}>
               {isLoading ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
@@ -941,7 +948,8 @@ export default function LessonsPage() {
                   setEditingLesson(null);
                   setShowForm(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="hover:opacity-90"
+                style={{ backgroundColor: DEEP_PURPLE }}
               >
                 <Plus className="w-4 h-4 mr-2" /> Nova Aula
               </Button>
@@ -1290,13 +1298,14 @@ export default function LessonsPage() {
                           onClick={(e) => handleLessonClick(lesson, e)}
                           className={`text-xs p-1.5 rounded truncate cursor-pointer transition-all hover:scale-[1.02] ${
                             lesson.endOfCycle
-                              ? 'bg-purple-500 text-white'
+                              ? 'text-white'
                               : `${statusColors[lesson.status]} text-white`
                           }`}
+                          style={lesson.endOfCycle ? { backgroundColor: DEEP_PURPLE } : {}}
                         >
                           {lesson.endOfCycle ? (
-                            <span className="flex items-center gap-1">
-                              <Flag className="w-3 h-3" /> Fim do Ciclo
+                            <span className="flex items-center justify-center gap-1 font-bold">
+                              <Flag className="w-3 h-3 flex-shrink-0" /> 🎯
                             </span>
                           ) : (
                             <>
@@ -1341,7 +1350,7 @@ export default function LessonsPage() {
               <span className="text-sm">Remarcada</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-purple-500"></div>
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: DEEP_PURPLE }}></div>
               <span className="text-sm">Fim do Ciclo</span>
             </div>
           </div>

@@ -30,6 +30,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useFirestore';
 
+// Deep Purple theme color
+const DEEP_PURPLE = '#844FC1';
+
 // Expiration Modal
 function ExpirationModal({ darkMode }: { darkMode: boolean }) {
   return (
@@ -89,6 +92,7 @@ function StatsCard({
     blue: 'bg-blue-50 text-blue-600',
     purple: 'bg-purple-50 text-purple-600',
     indigo: 'bg-indigo-50 text-indigo-600',
+    deepPurple: 'bg-opacity-10 text-[#844FC1]',
     green: 'bg-emerald-50 text-emerald-600',
     amber: 'bg-amber-50 text-amber-600',
   };
@@ -97,6 +101,7 @@ function StatsCard({
     blue: 'bg-blue-900/30 text-blue-400',
     purple: 'bg-purple-900/30 text-purple-400',
     indigo: 'bg-indigo-900/30 text-indigo-400',
+    deepPurple: 'bg-[#844FC1]/20 text-[#a855f7]',
     green: 'bg-emerald-900/30 text-emerald-400',
     amber: 'bg-amber-900/30 text-amber-400',
   };
@@ -119,8 +124,8 @@ function StatsCard({
             {subtitle}
           </p>
         </div>
-        <div className={`p-3 rounded-xl ${darkMode ? darkColorClasses[color] : colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`p-3 rounded-xl ${darkMode ? darkColorClasses[color] : colorClasses[color]}`} style={color === 'deepPurple' ? { backgroundColor: 'rgba(132, 79, 193, 0.1)' } : {}}>
+          <Icon className="w-5 h-5" style={color === 'deepPurple' ? { color: DEEP_PURPLE } : {}} />
         </div>
       </div>
     </motion.div>
@@ -395,7 +400,7 @@ export default function Dashboard() {
               value={`R$ ${expectedMonthlyRevenue.toFixed(2)}`}
               subtitle="Faturamento esperado"
               icon={TrendingUp}
-              color="indigo"
+              color="deepPurple"
               darkMode={darkMode}
             />
           </div>
@@ -416,7 +421,7 @@ export default function Dashboard() {
                     darkMode ? 'text-white' : 'text-slate-800'
                   }`}
                 >
-                  <Calendar className="w-5 h-5 text-blue-500" />
+                  <Calendar className="w-5 h-5" style={{ color: DEEP_PURPLE }} />
                   Próximas Aulas
                 </h2>
                 <Button
