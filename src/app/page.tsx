@@ -14,6 +14,7 @@ import {
   Plus,
   Calendar,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -30,49 +31,61 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useFirestore';
 
-// Deep Purple theme color
-const DEEP_PURPLE = '#844FC1';
+// Futuristic Theme Colors
+const CYAN = '#00F2FE';
+const PURPLE = '#8A2BE2';
 
-// Expiration Modal
+// Expiration Modal - Futuristic Style
 function ExpirationModal({ darkMode }: { darkMode: boolean }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-2xl w-full max-w-md p-6 text-center ${
-        darkMode ? 'bg-slate-800' : 'bg-white'
-      }`}>
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
-          <AlertCircle className="w-8 h-8 text-amber-600" />
-        </div>
-        <h2 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-          Contrato Expirado
-        </h2>
-        <p className={`mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-          Seu plano expirou. Entre em contato conosco para renovar seu acesso ao ProClass.
-        </p>
-        <div className={`p-4 rounded-xl mb-4 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-            </div>
-            <div className="text-left">
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>WhatsApp</p>
-              <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                (11) 98861-1088
-              </p>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className={`rounded-3xl w-full max-w-md p-8 text-center relative overflow-hidden ${
+          darkMode ? 'glass-dark' : 'glass-light'
+        }`}
+      >
+        {/* Glow Effect */}
+        <div className="absolute -top-20 -right-20 w-40 h-40 bg-amber-500/20 blur-3xl rounded-full"></div>
+        
+        <div className="relative z-10">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+            <AlertCircle className="w-10 h-10 text-amber-500" />
+          </div>
+          <h2 className={`text-2xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            Contrato Expirado
+          </h2>
+          <p className={`mb-6 ${darkMode ? 'text-gray-400' : 'text-slate-600'}`}>
+            Seu plano expirou. Entre em contato conosco para renovar seu acesso ao ProClass.
+          </p>
+          <div className={`p-5 rounded-2xl mb-6 ${
+            darkMode ? 'bg-white/5 border border-white/10' : 'bg-slate-50 border border-slate-200'
+          }`}>
+            <div className="flex items-center justify-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30">
+                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>WhatsApp</p>
+                <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  (11) 98861-1088
+                </p>
+              </div>
             </div>
           </div>
+          <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
+            Entre em contato para regularizar seu plano e continuar usando o sistema.
+          </p>
         </div>
-        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-          Entre em contato para regularizar seu plano e continuar usando o sistema.
-        </p>
-      </div>
+      </motion.div>
     </div>
   );
 }
 
-// Stats Card Component
+// Stats Card Component - Futuristic Style
 function StatsCard({
   title,
   value,
@@ -88,67 +101,90 @@ function StatsCard({
   color: string;
   darkMode: boolean;
 }) {
-  const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600',
-    purple: 'bg-purple-50 text-purple-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
-    deepPurple: 'bg-opacity-10 text-[#844FC1]',
-    green: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600',
+  const colorConfig: Record<string, { gradient: string; iconBg: string; iconColor: string; glow: string }> = {
+    cyan: {
+      gradient: 'from-cyan-500/10 to-transparent',
+      iconBg: darkMode ? 'bg-cyan-500/20' : 'bg-cyan-100',
+      iconColor: 'text-cyan-500',
+      glow: 'shadow-cyan-500/20',
+    },
+    purple: {
+      gradient: 'from-purple-500/10 to-transparent',
+      iconBg: darkMode ? 'bg-purple-500/20' : 'bg-purple-100',
+      iconColor: 'text-purple-500',
+      glow: 'shadow-purple-500/20',
+    },
+    green: {
+      gradient: 'from-emerald-500/10 to-transparent',
+      iconBg: darkMode ? 'bg-emerald-500/20' : 'bg-emerald-100',
+      iconColor: 'text-emerald-500',
+      glow: 'shadow-emerald-500/20',
+    },
+    amber: {
+      gradient: 'from-amber-500/10 to-transparent',
+      iconBg: darkMode ? 'bg-amber-500/20' : 'bg-amber-100',
+      iconColor: 'text-amber-500',
+      glow: 'shadow-amber-500/20',
+    },
+    gradient: {
+      gradient: 'from-cyan-500/10 via-purple-500/10 to-transparent',
+      iconBg: 'bg-gradient-to-br from-cyan-500 to-purple-500',
+      iconColor: 'text-white',
+      glow: 'shadow-purple-500/30',
+    },
   };
 
-  const darkColorClasses: Record<string, string> = {
-    blue: 'bg-blue-900/30 text-blue-400',
-    purple: 'bg-purple-900/30 text-purple-400',
-    indigo: 'bg-indigo-900/30 text-indigo-400',
-    deepPurple: 'bg-[#844FC1]/20 text-[#a855f7]',
-    green: 'bg-emerald-900/30 text-emerald-400',
-    amber: 'bg-amber-900/30 text-amber-400',
-  };
+  const config = colorConfig[color] || colorConfig.cyan;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl p-5 shadow-sm border ${
-        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className={`relative rounded-2xl p-5 overflow-hidden ${
+        darkMode 
+          ? 'glass-dark' 
+          : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
       }`}
     >
-      <div className="flex items-center justify-between">
+      {/* Gradient Background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} pointer-events-none`}></div>
+      
+      <div className="relative z-10 flex items-center justify-between">
         <div>
-          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{title}</p>
+          <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>{title}</p>
           <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
             {value}
           </p>
-          <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
             {subtitle}
           </p>
         </div>
-        <div className={`p-3 rounded-xl ${darkMode ? darkColorClasses[color] : colorClasses[color]}`} style={color === 'deepPurple' ? { backgroundColor: 'rgba(132, 79, 193, 0.1)' } : {}}>
-          <Icon className="w-5 h-5" style={color === 'deepPurple' ? { color: DEEP_PURPLE } : {}} />
+        <div className={`p-3 rounded-xl ${config.iconBg} shadow-lg ${config.glow}`}>
+          <Icon className={`w-5 h-5 ${config.iconColor}`} />
         </div>
       </div>
     </motion.div>
   );
 }
 
-// Loading Skeleton
+// Loading Skeleton - Futuristic
 function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
+    <div className={`min-h-screen ${darkMode ? 'bg-futuristic' : 'bg-slate-50'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Skeleton */}
         <div className="mb-8 animate-pulse">
-          <div className={`h-8 w-48 rounded ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-          <div className={`h-4 w-64 mt-2 rounded ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          <div className={`h-8 w-48 rounded-xl ${darkMode ? 'bg-white/5' : 'bg-slate-200'}`}></div>
+          <div className={`h-4 w-64 mt-3 rounded-xl ${darkMode ? 'bg-white/5' : 'bg-slate-200'}`}></div>
         </div>
         
         {/* Stats Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className={`rounded-2xl p-5 ${darkMode ? 'bg-slate-800' : 'bg-white'} animate-pulse`}>
-              <div className={`h-4 w-24 rounded ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-              <div className={`h-8 w-16 mt-2 rounded ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div key={i} className={`rounded-2xl p-5 ${darkMode ? 'glass-dark' : 'bg-white border border-slate-100'} animate-pulse`}>
+              <div className={`h-4 w-24 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
+              <div className={`h-8 w-16 mt-3 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
             </div>
           ))}
         </div>
@@ -156,11 +192,11 @@ function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
         {/* Content Skeleton */}
         <div className="grid lg:grid-cols-2 gap-6">
           {[...Array(2)].map((_, i) => (
-            <div key={i} className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'} animate-pulse`}>
-              <div className={`h-6 w-32 rounded ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div key={i} className={`rounded-2xl p-6 ${darkMode ? 'glass-dark' : 'bg-white border border-slate-100'} animate-pulse`}>
+              <div className={`h-6 w-32 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
               <div className="mt-4 space-y-3">
                 {[...Array(3)].map((_, j) => (
-                  <div key={j} className={`h-16 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}></div>
+                  <div key={j} className={`h-16 rounded-xl ${darkMode ? 'bg-white/5' : 'bg-slate-100'}`}></div>
                 ))}
               </div>
             </div>
@@ -181,14 +217,11 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const router = useRouter();
   
-  // Calcular teacherId corretamente
-  // Cada usuário (admin ou professor) vê apenas seus próprios dados
   const teacherId = useMemo(() => {
     if (!userData) return null;
     return userData.id;
   }, [userData]);
   
-  // Limpar cache quando o usuário mudar para evitar dados de outras sessões
   useEffect(() => {
     if (userData?.id) {
       queryClient.removeQueries({ queryKey: ['students'] });
@@ -205,32 +238,30 @@ export default function Dashboard() {
     }
   }, [user, authLoading, router]);
 
-  // Data atual fixa para evitar re-criação
   const today = useMemo(() => new Date(), []);
   const currentDay = today.getDate();
   const currentMonth = format(today, 'yyyy-MM');
   const formattedToday = format(today, "EEEE, dd 'de' MMMM", { locale: ptBR });
 
-  // Se expirado, mostrar modal
   if (isExpired) {
-    return (
-      <ExpirationModal darkMode={darkMode} />
-    );
+    return <ExpirationModal darkMode={darkMode} />;
   }
 
-  // Aguardar carregamento do auth
   if (authLoading || !userData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-futuristic">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-slate-600">Carregando dados do usuário...</p>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 animate-spin opacity-75"></div>
+            <div className="absolute inset-2 rounded-full bg-[#121212]"></div>
+            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-cyan-400" />
+          </div>
+          <p className="text-gray-400 animate-pulse">Carregando dados...</p>
         </div>
       </div>
     );
   }
 
-  // Se não tem usuário, não renderizar
   if (!user) {
     return null;
   }
@@ -238,7 +269,6 @@ export default function Dashboard() {
   const monthStart = startOfMonth(parse(selectedMonth + '-01', 'yyyy-MM-dd', new Date()));
   const monthEnd = endOfMonth(parse(selectedMonth + '-01', 'yyyy-MM-dd', new Date()));
 
-  // Calculations
   const activeStudents = students.filter((s) => s.status === 'active').length;
 
   const expectedMonthlyRevenue = students
@@ -254,33 +284,14 @@ export default function Dashboard() {
     );
   });
 
-  // Receita Recebida - baseada no referenceMonth do pagamento (mês a que se refere)
   const monthlyIncome = payments
     .filter((p) => p.status === 'paid')
     .filter((p) => p.referenceMonth === selectedMonth)
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  // Receita recebida no período (por data de pagamento)
-  const incomeReceivedInPeriod = payments
-    .filter((p) => p.status === 'paid' && p.paymentDate)
-    .filter((p) => {
-      const payDate = parseISO(p.paymentDate!);
-      return payDate >= monthStart && payDate <= monthEnd;
-    })
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-  // Pagamentos pendentes do mês de referência
-  const pendingPaymentsAmount = payments
-    .filter((p) => (p.status === 'pending' || p.status === 'overdue'))
-    .filter((p) => p.referenceMonth === selectedMonth)
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-  // Alertas de Pagamento baseados no dia de vencimento do aluno
-  // REGRA: Comparar dia atual com paymentDay do cadastro do aluno
   const paymentAlerts = students
     .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
     .filter(student => {
-      // Verificar se já existe pagamento para este aluno no mês atual
       const hasPaymentThisMonth = payments.some(
         p => p.studentId === student.id && 
              p.referenceMonth === currentMonth && 
@@ -294,20 +305,16 @@ export default function Dashboard() {
       phone: student.phone,
       amount: student.monthlyFee!,
       dueDate: student.paymentDay!,
-      // Atrasado se o dia atual já passou do dia de vencimento
       isOverdue: currentDay > student.paymentDay!,
     }))
     .sort((a, b) => {
-      // Ordenar: atrasados primeiro, depois por dia de vencimento
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       return a.dueDate - b.dueDate;
     });
 
-  // A receber = total de mensalidades pendentes (baseado nos alertas)
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
 
-  // Aulas concluídas - IGNORA marcadores de final de ciclo
   const completedLessons = lessons
     .filter((l) => l.status === 'completed' && l.date && !l.endOfCycle)
     .filter((l) => {
@@ -319,7 +326,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className={`min-h-screen ${darkMode ? 'bg-slate-900' : ''}`}>
+      <div className={`min-h-screen ${darkMode ? 'bg-futuristic' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <motion.div
@@ -328,34 +335,43 @@ export default function Dashboard() {
             className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
           >
             <div>
-              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+              <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                 Olá, {userData?.name || 'Professor'}! 👋
               </h1>
-              <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              <p className={`mt-1 ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
                 {formattedToday} • Resumo do seu desempenho
               </p>
             </div>
 
             <div className="flex items-center gap-3">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className={`w-[180px] ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white'}`}>
-                  <Calendar className="w-4 h-4 mr-2" />
+                <SelectTrigger className={`w-[200px] rounded-xl ${
+                  darkMode 
+                    ? 'bg-white/5 border-white/10 text-white' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <Calendar className="w-4 h-4 mr-2" style={{ color: CYAN }} />
                   <SelectValue placeholder="Selecione o mês" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={darkMode ? 'bg-[#1a1a1a] border-white/10' : ''}>
                   {Array.from({ length: 12 }).map((_, i) => {
                     const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
                     const value = format(date, 'yyyy-MM');
                     const label = format(date, "MMMM 'de' yyyy", { locale: ptBR });
                     return (
-                      <SelectItem key={value} value={value}>
+                      <SelectItem key={value} value={value} className={darkMode ? 'text-white hover:bg-white/5' : ''}>
                         {label}
                       </SelectItem>
                     );
                   })}
                 </SelectContent>
               </Select>
-              <Button onClick={() => refetch()} variant="outline" size="icon" className={darkMode ? 'border-slate-700 text-white' : ''}>
+              <Button 
+                onClick={() => refetch()} 
+                variant="outline" 
+                size="icon" 
+                className={`rounded-xl ${darkMode ? 'border-white/10 text-white hover:bg-white/5' : ''}`}
+              >
                 <TrendingUp className="w-4 h-4" />
               </Button>
             </div>
@@ -368,7 +384,7 @@ export default function Dashboard() {
               value={activeStudents}
               subtitle="Total de alunos"
               icon={Users}
-              color="blue"
+              color="cyan"
               darkMode={darkMode}
             />
             <StatsCard
@@ -400,7 +416,7 @@ export default function Dashboard() {
               value={`R$ ${expectedMonthlyRevenue.toFixed(2)}`}
               subtitle="Faturamento esperado"
               icon={TrendingUp}
-              color="deepPurple"
+              color="gradient"
               darkMode={darkMode}
             />
           </div>
@@ -411,35 +427,41 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className={`rounded-2xl p-6 shadow-sm border ${
-                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+              className={`rounded-2xl p-6 ${
+                darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
               }`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2
-                  className={`text-lg font-semibold flex items-center gap-2 ${
-                    darkMode ? 'text-white' : 'text-slate-800'
-                  }`}
-                >
-                  <Calendar className="w-5 h-5" style={{ color: DEEP_PURPLE }} />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className={`text-lg font-semibold flex items-center gap-2 ${
+                  darkMode ? 'text-white' : 'text-slate-800'
+                }`}>
+                  <div className={`p-2 rounded-lg ${darkMode ? 'bg-cyan-500/20' : 'bg-cyan-100'}`}>
+                    <Calendar className="w-5 h-5 text-cyan-500" />
+                  </div>
                   Próximas Aulas
                 </h2>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push('/lessons')}
-                  className={darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600'}
+                  className={`rounded-xl ${darkMode ? 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10' : 'text-cyan-600 hover:bg-cyan-50'}`}
                 >
                   Ver todas
                 </Button>
               </div>
 
               {upcomingLessons.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Nenhuma aula agendada para os próximos 7 dias</p>
+                <div className="text-center py-12">
+                  <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                    darkMode ? 'bg-white/5' : 'bg-slate-100'
+                  }`}>
+                    <Calendar className={`w-8 h-8 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`} />
+                  </div>
+                  <p className={darkMode ? 'text-gray-400' : 'text-slate-500'}>
+                    Nenhuma aula agendada para os próximos 7 dias
+                  </p>
                   <Button
-                    variant="outline"
-                    className={`mt-4 ${darkMode ? 'border-slate-700 text-white' : ''}`}
+                    className="mt-4 btn-gradient rounded-xl"
                     onClick={() => router.push('/lessons')}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Agendar Aula
@@ -448,25 +470,31 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-3">
                   {upcomingLessons.slice(0, 5).map((lesson) => (
-                    <div
+                    <motion.div
                       key={lesson.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                      whileHover={{ x: 4 }}
+                      className={`flex items-center justify-between p-4 rounded-xl transition-colors ${
+                        darkMode 
+                          ? 'bg-white/5 hover:bg-white/10 border border-white/5' 
+                          : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
                       <div>
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                           {lesson.studentName}
                         </p>
-                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {format(parseISO(lesson.date), "dd 'de' MMMM", { locale: ptBR })} •{' '}
-                          {lesson.startTime}
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                          {format(parseISO(lesson.date), "dd 'de' MMMM", { locale: ptBR })} • {lesson.startTime}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                        darkMode 
+                          ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
+                          : 'bg-cyan-100 text-cyan-700'
+                      }`}>
                         {lesson.subject}
                       </span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -477,64 +505,78 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className={`rounded-2xl p-6 shadow-sm border ${
-                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+              className={`rounded-2xl p-6 ${
+                darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
               }`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2
-                  className={`text-lg font-semibold flex items-center gap-2 ${
-                    darkMode ? 'text-white' : 'text-slate-800'
-                  }`}
-                >
-                  <AlertCircle className="w-5 h-5 text-amber-500" />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className={`text-lg font-semibold flex items-center gap-2 ${
+                  darkMode ? 'text-white' : 'text-slate-800'
+                }`}>
+                  <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                  </div>
                   Alertas de Pagamento
                   {paymentAlerts.length > 0 && (
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-sm">
+                    <span className={`ml-2 px-2.5 py-1 rounded-lg text-sm font-medium ${
+                      darkMode 
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
                       {paymentAlerts.length}
                     </span>
                   )}
                 </h2>
               </div>
               {paymentAlerts.length === 0 ? (
-                <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Nenhum pagamento pendente
-                </p>
+                <div className="text-center py-12">
+                  <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                    darkMode ? 'bg-emerald-500/20' : 'bg-emerald-100'
+                  }`}>
+                    <DollarSign className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <p className={darkMode ? 'text-gray-400' : 'text-slate-500'}>
+                    Nenhum pagamento pendente
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {paymentAlerts.slice(0, 5).map((alert, index) => (
-                    <div
+                    <motion.div
                       key={index}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                      whileHover={{ x: 4 }}
+                      className={`flex items-center justify-between p-4 rounded-xl transition-colors ${
+                        darkMode 
+                          ? 'bg-white/5 hover:bg-white/10 border border-white/5' 
+                          : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
                       <div className="flex-1">
                         <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                           {alert.studentName}
                           {!alert.phone && (
-                            <span className="ml-2 text-xs text-slate-400">(sem telefone)</span>
+                            <span className="ml-2 text-xs text-gray-500">(sem telefone)</span>
                           )}
                         </p>
-                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
                           Vencimento: dia {alert.dueDate}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2 py-1 rounded text-sm font-bold ${
-                            alert.isOverdue
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          R$ {alert.amount.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
+                      <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${
+                        alert.isOverdue
+                          ? darkMode 
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : 'bg-red-100 text-red-700'
+                          : darkMode
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        R$ {alert.amount.toFixed(2)}
+                      </span>
+                    </motion.div>
                   ))}
                   {paymentAlerts.length > 5 && (
-                    <p className={`text-sm text-center pt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-sm text-center pt-2 ${darkMode ? 'text-gray-500' : 'text-slate-500'}`}>
                       E mais {paymentAlerts.length - 5} pendente(s)...
                     </p>
                   )}

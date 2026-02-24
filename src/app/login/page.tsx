@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { GraduationCap, Loader2 } from 'lucide-react';
+import { GraduationCap, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,33 +45,65 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-futuristic">
+        <div className="text-center">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 animate-spin opacity-75"></div>
+            <div className="absolute inset-2 rounded-full bg-[#121212]"></div>
+            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-cyan-400" />
+          </div>
+          <p className="text-gray-400 animate-pulse">Carregando...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-futuristic flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Glowing orbs */}
+        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-cyan-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-full blur-3xl"></div>
+        
+        {/* Grid lines */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,242,254,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,242,254,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+        <div className="glass-dark rounded-3xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-8 text-center">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <GraduationCap className="w-10 h-10 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">ProClass</h1>
-            <p className="text-blue-100 mt-1">Sistema de Gestão de Aulas</p>
+          <div className="relative p-8 text-center">
+            {/* Glow effect behind logo */}
+            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 to-transparent"></div>
+            
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="relative"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-cyan-500/30 relative overflow-hidden">
+                <GraduationCap className="w-10 h-10 text-white relative z-10" />
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse"></div>
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">ProClass</h1>
+              <p className="text-gray-400">Sistema de Gestão de Aulas</p>
+            </motion.div>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-gray-300 text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -79,12 +111,14 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
                 required
-                className="h-12"
+                className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-500 rounded-xl focus:border-cyan-500 focus:ring-cyan-500/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password" className="text-gray-300 text-sm font-medium">
+                Senha
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -92,14 +126,14 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="h-12"
+                className="h-12 bg-white/5 border-white/10 text-white placeholder:text-gray-500 rounded-xl focus:border-cyan-500 focus:ring-cyan-500/20"
               />
             </div>
 
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              className="w-full h-12 btn-gradient text-white font-medium rounded-xl text-base shadow-lg shadow-purple-500/20"
             >
               {isLoading ? (
                 <>
@@ -114,11 +148,14 @@ export default function LoginPage() {
 
           {/* Footer */}
           <div className="px-8 pb-8 text-center">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-gray-500">
               Sistema de gestão para professores
             </p>
           </div>
         </div>
+
+        {/* Bottom glow */}
+        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-cyan-500/20 blur-2xl rounded-full"></div>
       </motion.div>
     </div>
   );
