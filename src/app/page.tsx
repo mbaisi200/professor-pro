@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import {
   Users,
   BookOpen,
@@ -167,23 +168,13 @@ function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
-  const [mounted, setMounted] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+
+  const { resolvedTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
 
   const { user, userData, loading: authLoading, isExpired } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
-  
-  // Carregar preferências do cliente
-  useEffect(() => {
-    // Use requestAnimationFrame to defer setState to next tick
-    const timer = requestAnimationFrame(() => {
-      const saved = localStorage.getItem('darkMode');
-      setDarkMode(saved === 'true');
-      setMounted(true);
-    });
-    return () => cancelAnimationFrame(timer);
-  }, []);
   
   // Calcular teacherId corretamente
   // Cada usuário (admin ou professor) vê apenas seus próprios dados
@@ -214,15 +205,6 @@ export default function Dashboard() {
   const currentDay = today.getDate();
   const currentMonth = format(today, 'yyyy-MM');
   const formattedToday = format(today, "EEEE, dd 'de' MMMM", { locale: ptBR });
-
-  // Aguardar montagem no cliente
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
 
   // Se expirado, mostrar modal
   if (isExpired) {
