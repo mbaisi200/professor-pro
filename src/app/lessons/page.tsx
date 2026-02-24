@@ -544,7 +544,7 @@ export default function LessonsPage() {
           }
         }
 
-        toast({ title: 'Aula agendada!' });
+        toast({ title: `Aula ${statusLabels[data.status] || 'salva'}!` });
       }
 
       // Invalidar cache para atualizar outras páginas

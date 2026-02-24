@@ -176,9 +176,13 @@ export default function Dashboard() {
   
   // Carregar preferências do cliente
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    setDarkMode(saved === 'true');
-    setMounted(true);
+    // Use requestAnimationFrame to defer setState to next tick
+    const timer = requestAnimationFrame(() => {
+      const saved = localStorage.getItem('darkMode');
+      setDarkMode(saved === 'true');
+      setMounted(true);
+    });
+    return () => cancelAnimationFrame(timer);
   }, []);
   
   // Calcular teacherId corretamente
