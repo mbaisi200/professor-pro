@@ -116,7 +116,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     : navigation;
 
   return (
-    <div className={`flex min-h-screen ${darkMode ? 'bg-futuristic' : 'bg-gradient-to-br from-slate-50 via-white to-slate-100'}`}>
+    <div className={`flex min-h-screen ${darkMode ? 'bg-futuristic' : 'bg-gradient-to-br from-slate-50 via-purple-50/30 to-cyan-50/20'}`}>
       {/* Mobile sidebar backdrop */}
       <AnimatePresence>
         {sidebarOpen && (

@@ -393,10 +393,10 @@ function StudentForm({
             </label>
             <textarea
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Anotações sobre o aluno..."
+              onChange={(e) => setForm({ ...form, notes: e.target.value.toUpperCase() })}
+              placeholder="ANOTAÇÕES SOBRE O ALUNO..."
               rows={3}
-              className={`w-full mt-1 px-3 py-2 rounded-lg border resize-none ${
+              className={`w-full mt-1 px-3 py-2 rounded-lg border resize-none uppercase ${
                 darkMode
                   ? 'bg-slate-700 border-slate-600 text-white'
                   : 'bg-white border-slate-200'

@@ -315,8 +315,18 @@ export default function Dashboard() {
 
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
 
+  // Aulas concluídas - IGNORA marcadores de final de ciclo
+  // REGRA: Aulas com endOfCycle=true são apenas marcadores, não aulas reais
   const completedLessons = lessons
-    .filter((l) => l.status === 'completed' && l.date && !l.endOfCycle)
+    .filter((l) => l.status === 'completed' && l.date && l.endOfCycle !== true)
+    .filter((l) => {
+      const lessonDate = parseISO(l.date);
+      return lessonDate >= monthStart && lessonDate <= monthEnd;
+    }).length;
+
+  // Total de aulas do mês (excluindo marcadores de fim de ciclo)
+  const totalLessonsThisMonth = lessons
+    .filter((l) => l.endOfCycle !== true)
     .filter((l) => {
       const lessonDate = parseISO(l.date);
       return lessonDate >= monthStart && lessonDate <= monthEnd;
@@ -326,7 +336,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className={`min-h-screen ${darkMode ? 'bg-futuristic' : ''}`}>
+      <div className={`min-h-screen ${darkMode ? 'bg-futuristic' : 'bg-gradient-to-br from-slate-50 via-slate-100/50 to-purple-50/20'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <motion.div
@@ -388,9 +398,9 @@ export default function Dashboard() {
               darkMode={darkMode}
             />
             <StatsCard
-              title="Aulas no Mês"
+              title="Aulas Concluídas"
               value={completedLessons}
-              subtitle="Aulas concluídas"
+              subtitle={totalLessonsThisMonth > 0 ? `de ${totalLessonsThisMonth} no mês` : 'no mês'}
               icon={BookOpen}
               color="purple"
               darkMode={darkMode}

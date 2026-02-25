@@ -59,7 +59,7 @@
   --color-matte-white: #E0E0E0;
 }
 
-/* Light Mode - Clean & Modern */
+/* Light Mode - Clean & Modern with subtle gradient */
 :root {
   --radius: 0.75rem;
   --background: #f8fafc;
@@ -93,6 +93,11 @@
   --sidebar-accent-foreground: #1e293b;
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #8A2BE2;
+}
+
+/* Light mode body styling */
+body:not(.dark) {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #faf5ff 100%);
 }
 
 /* Dark Mode - Futuristic Theme */

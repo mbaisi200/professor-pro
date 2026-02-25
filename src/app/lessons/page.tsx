@@ -269,10 +269,10 @@ function LessonForm({
             </label>
             <textarea
               value={form.contentCovered}
-              onChange={(e) => setForm({ ...form, contentCovered: e.target.value })}
-              placeholder="O que foi ensinado na aula..."
+              onChange={(e) => setForm({ ...form, contentCovered: e.target.value.toUpperCase() })}
+              placeholder="O QUE FOI ENSINADO NA AULA..."
               rows={3}
-              className={`w-full mt-1 px-3 py-2 rounded-lg border resize-none ${
+              className={`w-full mt-1 px-3 py-2 rounded-lg border resize-none uppercase ${
                 darkMode
                   ? 'bg-slate-700 border-slate-600 text-white'
                   : 'bg-white border-slate-200'
