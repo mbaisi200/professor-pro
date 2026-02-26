@@ -8,6 +8,14 @@ function getFirebaseAdminApp() {
   if (getApps().length === 0) {
     // Use environment variables for Firebase Admin SDK
     let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '';
+    
+    console.log('=== DEBUG Firebase Admin SDK ===');
+    console.log('FIREBASE_CLIENT_EMAIL:', clientEmail ? '✅ Configurado' : '❌ Faltando');
+    console.log('NEXT_PUBLIC_FIREBASE_PROJECT_ID:', projectId ? '✅ Configurado' : '❌ Faltando');
+    console.log('FIREBASE_PRIVATE_KEY length:', privateKey.length);
+    console.log('FIREBASE_PRIVATE_KEY starts with:', privateKey.substring(0, 30));
     
     // Handle different formats of the private key
     // If it contains literal \n, replace with actual newlines
@@ -20,13 +28,17 @@ function getFirebaseAdminApp() {
       privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
     }
     
-    if (!privateKey || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+    const hasPrivateKey = privateKey.length > 100;
+    const hasClientEmail = clientEmail.length > 0;
+    const hasProjectId = projectId.length > 0;
+
+    if (!hasPrivateKey || !hasClientEmail || !hasProjectId) {
       console.error('Missing Firebase Admin SDK credentials:', {
-        hasPrivateKey: !!privateKey,
-        hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-        hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        hasPrivateKey,
+        hasClientEmail,
+        hasProjectId,
       });
-      throw new Error('Firebase Admin SDK credentials not configured');
+      throw new Error(`Firebase Admin SDK não configurado. Variáveis faltando: ${!hasPrivateKey ? 'FIREBASE_PRIVATE_KEY ' : ''}${!hasClientEmail ? 'FIREBASE_CLIENT_EMAIL ' : ''}${!hasProjectId ? 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' : ''}. Acesse Firebase Console > Configurações > Contas de serviço para gerar a chave.`);
     }
 
     try {

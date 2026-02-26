@@ -1455,18 +1455,19 @@ export default function AdminPage() {
     const studentsSnapshot = await getDocs(query(collection(db, 'students'), where('teacherId', '==', id)));
     const lessonsSnapshot = await getDocs(query(collection(db, 'lessons'), where('teacherId', '==', id)));
     const paymentsSnapshot = await getDocs(query(collection(db, 'payments'), where('teacherId', '==', id)));
+    const teacherPaymentsSnapshot = await getDocs(query(collection(db, 'teacherPayments'), where('teacherId', '==', id)));
     
     // Buscar o teacher para pegar o uid (se tiver acesso auth)
     const teacherToDelete = teachers.find(t => t.id === id);
     const hasAuthAccess = teacherToDelete?.uid || teacherToDelete?.hasAuth;
     
-    const totalLinked = studentsSnapshot.size + lessonsSnapshot.size + paymentsSnapshot.size;
+    const totalLinked = studentsSnapshot.size + lessonsSnapshot.size + paymentsSnapshot.size + teacherPaymentsSnapshot.size;
     
     let confirmMessage = 'Deseja realmente excluir este professor?';
     if (totalLinked > 0 && hasAuthAccess) {
-      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s)\n- Acesso ao sistema (login)\n\nTodos esses dados também serão EXCLUÍDOS e ele PERDERÁ O ACESSO!\n\nDeseja continuar?`;
+      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s) de alunos\n- ${teacherPaymentsSnapshot.size} mensalidade(s)\n- Acesso ao sistema (login)\n\nTodos esses dados também serão EXCLUÍDOS e ele PERDERÁ O ACESSO!\n\nDeseja continuar?`;
     } else if (totalLinked > 0) {
-      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s)\n\nTodos esses dados também serão EXCLUÍDOS!\n\nDeseja continuar?`;
+      confirmMessage = `ATENÇÃO! Este professor possui:\n\n- ${studentsSnapshot.size} aluno(s)\n- ${lessonsSnapshot.size} aula(s)\n- ${paymentsSnapshot.size} pagamento(s) de alunos\n- ${teacherPaymentsSnapshot.size} mensalidade(s)\n\nTodos esses dados também serão EXCLUÍDOS!\n\nDeseja continuar?`;
     } else if (hasAuthAccess) {
       confirmMessage = 'Este professor possui ACESSO AO SISTEMA.\n\nAo excluir, ele PERDERÁ o acesso!\n\nDeseja continuar?';
     }
@@ -1474,15 +1475,21 @@ export default function AdminPage() {
     if (!confirm(confirmMessage)) return;
 
     try {
-      // Excluir dados vinculados
+      // Excluir dados vinculados - ALUNOS
       for (const studentDoc of studentsSnapshot.docs) {
         await deleteDoc(doc(db, 'students', studentDoc.id));
       }
+      // Excluir dados vinculados - AULAS
       for (const lessonDoc of lessonsSnapshot.docs) {
         await deleteDoc(doc(db, 'lessons', lessonDoc.id));
       }
+      // Excluir dados vinculados - PAGAMENTOS DE ALUNOS
       for (const paymentDoc of paymentsSnapshot.docs) {
         await deleteDoc(doc(db, 'payments', paymentDoc.id));
+      }
+      // Excluir dados vinculados - MENSALIDADES DO PROFESSOR
+      for (const teacherPaymentDoc of teacherPaymentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'teacherPayments', teacherPaymentDoc.id));
       }
       
       // Excluir do Firebase Auth se tiver uid
