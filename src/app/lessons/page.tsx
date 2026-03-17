@@ -457,6 +457,7 @@ export default function LessonsPage() {
   const [showReport, setShowReport] = useState(false);
   const [reportStudent, setReportStudent] = useState<string>('all');
   const [reportPeriod, setReportPeriod] = useState<string>('all');
+  const [reportCycle, setReportCycle] = useState<string>('all');
   const [sortField, setSortField] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
@@ -676,6 +677,17 @@ export default function LessonsPage() {
         const lessonDate = parseISO(l.date);
         return lessonDate >= startDate && lessonDate <= endDate;
       });
+    }
+    
+    // Filtrar por ciclo
+    if (reportCycle !== 'all') {
+      if (reportCycle === 'cycle_end') {
+        // Mostrar apenas marcadores de fim de ciclo
+        filtered = filtered.filter(l => l.endOfCycle === true);
+      } else if (reportCycle === 'regular') {
+        // Mostrar apenas aulas regulares (não são fim de ciclo)
+        filtered = filtered.filter(l => l.endOfCycle !== true);
+      }
     }
     
     // Ordenar pelo campo selecionado
@@ -972,7 +984,7 @@ export default function LessonsPage() {
                     Filtros do Relatório
                   </h3>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Filtro Aluno */}
                     <div>
                       <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -1021,6 +1033,26 @@ export default function LessonsPage() {
                       </select>
                     </div>
 
+                    {/* Filtro Ciclo */}
+                    <div>
+                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Ciclo
+                      </label>
+                      <select
+                        value={reportCycle}
+                        onChange={(e) => setReportCycle(e.target.value)}
+                        className={`w-full mt-1 px-3 py-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <option value="all">Todos (Aulas + Ciclos)</option>
+                        <option value="regular">Apenas Aulas Regulares</option>
+                        <option value="cycle_end">Apenas Fim de Ciclo</option>
+                      </select>
+                    </div>
+
                     {/* Botões Exportar */}
                     <div className="flex items-end gap-2">
                       <Button
@@ -1039,7 +1071,7 @@ export default function LessonsPage() {
                   </div>
 
                   {/* Resumo */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
                     <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-blue-50'}`}>
                       <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-blue-700'}`}>
                         {getFilteredLessonsForReport().length}
@@ -1063,6 +1095,12 @@ export default function LessonsPage() {
                         {getFilteredLessonsForReport().filter(l => l.status === 'cancelled').length}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-red-600'}`}>Canceladas</p>
+                    </div>
+                    <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-slate-700' : 'bg-purple-50'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-purple-700'}`}>
+                        {getFilteredLessonsForReport().filter(l => l.endOfCycle === true).length}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-purple-600'}`}>Fim de Ciclo</p>
                     </div>
                   </div>
 

@@ -188,7 +188,11 @@ function TeacherForm({
     role: teacher?.role || 'teacher',
     expiresAt: teacher?.expiresAt || format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
     isExempt: teacher?.isExempt || false,
+    newPassword: '',
+    confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   const handleNameChange = (value: string) => {
     // Converter para maiúsculas
@@ -206,8 +210,30 @@ function TeacherForm({
     setForm({ ...form, phone: formatted });
   };
 
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+    let pass = '';
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setForm({ ...form, newPassword: pass, confirmPassword: pass });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordError('');
+    
+    // Validar senha se foi preenchida
+    if (form.newPassword) {
+      if (form.newPassword.length < 6) {
+        setPasswordError('A senha deve ter pelo menos 6 caracteres');
+        return;
+      }
+      if (form.newPassword !== form.confirmPassword) {
+        setPasswordError('As senhas não coincidem');
+        return;
+      }
+    }
     
     // Validar nome em maiúsculas e email em minúsculas
     const dataToSave = {
@@ -343,6 +369,73 @@ function TeacherForm({
               <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Padrão: 1 mês a partir de hoje
               </p>
+            </div>
+          )}
+
+          {/* Campo de Senha - só mostra na EDIÇÃO */}
+          {teacher && (
+            <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-blue-50 border-blue-200'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Key className={`w-4 h-4 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Alterar Senha de Acesso
+                </label>
+              </div>
+              <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Deixe em branco para manter a senha atual. Preencha apenas se desejar alterar.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Nova Senha
+                  </label>
+                  <div className="relative mt-1">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.newPassword}
+                      onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+                      placeholder="Mínimo 6 caracteres"
+                      className={`pr-10 ${darkMode ? 'bg-slate-600 border-slate-500 text-white' : 'bg-white'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Confirmar Nova Senha
+                  </label>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.confirmPassword}
+                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                    placeholder="Repita a nova senha"
+                    className={`mt-1 ${darkMode ? 'bg-slate-600 border-slate-500 text-white' : 'bg-white'}`}
+                  />
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generatePassword}
+                  className={`w-full text-sm ${darkMode ? 'border-slate-500 text-white hover:bg-slate-600' : 'border-blue-200 text-blue-700 hover:bg-blue-100'}`}
+                >
+                  🎲 Gerar Senha Aleatória
+                </Button>
+                
+                {passwordError && (
+                  <div className="p-2 rounded-lg bg-red-50 text-red-600 text-xs">
+                    {passwordError}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1419,7 +1512,45 @@ export default function AdminPage() {
           expiresAt: data.isExempt ? null : data.expiresAt,
           isExempt: data.isExempt,
         });
-        toast({ title: 'Professor atualizado!' });
+        
+        // Se foi fornecida uma nova senha, atualizar via API
+        if (data.newPassword && data.newPassword.length >= 6) {
+          try {
+            const response = await fetch('/api/create-user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: data.email.toLowerCase(),
+                password: data.newPassword,
+                displayName: data.name.toUpperCase(),
+                teacherId: editingTeacher.id,
+              }),
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              toast({
+                title: 'Aviso',
+                description: `Professor atualizado, mas houve erro ao alterar a senha: ${errorData.error || 'Erro desconhecido'}`,
+                variant: 'destructive',
+              });
+            } else {
+              toast({ 
+                title: 'Professor atualizado!',
+                description: 'Dados e senha atualizados com sucesso.'
+              });
+            }
+          } catch (passwordError: any) {
+            console.error('Erro ao atualizar senha:', passwordError);
+            toast({
+              title: 'Aviso',
+              description: 'Professor atualizado, mas houve erro ao alterar a senha.',
+              variant: 'destructive',
+            });
+          }
+        } else {
+          toast({ title: 'Professor atualizado!' });
+        }
       } else {
         const newId = `teacher-${Date.now()}`;
         await setDoc(doc(db, 'users', newId), {
@@ -1495,11 +1626,17 @@ export default function AdminPage() {
       // Excluir do Firebase Auth se tiver uid
       if (teacherToDelete?.uid) {
         try {
-          await fetch('/api/delete-user', {
+          const response = await fetch('/api/delete-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid: teacherToDelete.uid }),
           });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Erro ao excluir do Firebase Auth:', errorData);
+            // Continua mesmo se falhar a exclusão do Auth (o usuário pode não existir no Auth)
+          }
         } catch (authError) {
           console.error('Error deleting from Firebase Auth:', authError);
           // Continua mesmo se falhar a exclusão do Auth
@@ -1509,15 +1646,21 @@ export default function AdminPage() {
       // Excluir o professor do Firestore
       await deleteDoc(doc(db, 'users', id));
       
+      // Limpar cache local e atualizar lista
+      setTeachers(prev => prev.filter(t => t.id !== id));
+      
       toast({ 
         title: 'Professor excluído!', 
         description: totalLinked > 0 ? `${totalLinked} registro(s) vinculados também foram removidos` : undefined
       });
+      
+      // Recarregar dados do servidor para garantir sincronização
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro completo ao excluir professor:', error);
       toast({
-        title: 'Erro',
-        description: 'Erro ao excluir professor',
+        title: 'Erro ao excluir professor',
+        description: error?.message || 'Erro desconhecido. Verifique se você tem permissão de administrador.',
         variant: 'destructive',
       });
     }
