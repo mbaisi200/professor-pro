@@ -134,7 +134,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-72 z-50 transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-screen w-72 z-50 transition-transform duration-300 overflow-y-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 lg:sticky lg:top-0 ${
           darkMode 
@@ -257,7 +257,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="px-4 space-y-2 pb-40">
+        <nav className="px-4 space-y-2 pb-6">
           {allNavigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
