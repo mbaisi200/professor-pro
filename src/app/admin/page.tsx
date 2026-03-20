@@ -32,9 +32,10 @@ import {
   AlertCircle,
   Key,
   Eye,
-  EyeOff
+  EyeOff,
+  Database
 } from 'lucide-react';
-import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1098,7 +1099,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'teachers' | 'payments' | 'import'>('teachers');
+  const [activeTab, setActiveTab] = useState<'teachers' | 'payments' | 'import' | 'populate'>('teachers');
   const [importJson, setImportJson] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<any>(null);
@@ -1112,6 +1113,15 @@ export default function AdminPage() {
   const [showClearPaymentsModal, setShowClearPaymentsModal] = useState(false);
   const [clearFilter, setClearFilter] = useState<'all' | 'admin' | 'teacher'>('all');
   const [clearTeacherId, setClearTeacherId] = useState<string>('');
+  // Populate Data states
+  const [populateTeacherId, setPopulateTeacherId] = useState<string>('');
+  const [populateStartDate, setPopulateStartDate] = useState<string>(format(subMonths(new Date(), 2), 'yyyy-MM-dd'));
+  const [populateEndDate, setPopulateEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [populateStudentCount, setPopulateStudentCount] = useState<number>(5);
+  const [populateLessonsPerStudent, setPopulateLessonsPerStudent] = useState<number>(8);
+  const [clearBeforePopulate, setClearBeforePopulate] = useState<boolean>(true);
+  const [isPopulating, setIsPopulating] = useState<boolean>(false);
+  const [populateResults, setPopulateResults] = useState<any>(null);
   const { toast } = useToast();
 
   const { user, userData, loading } = useAuth();
@@ -1850,6 +1860,192 @@ export default function AdminPage() {
     return isBefore(expiresAt, new Date());
   };
 
+  // Popular dados de demonstração
+  const handlePopulateData = async () => {
+    if (!populateTeacherId) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione um professor para popular os dados',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsPopulating(true);
+    setPopulateResults(null);
+
+    try {
+      const results = {
+        students: 0,
+        lessons: 0,
+        payments: 0,
+        errors: [] as string[],
+      };
+
+      // Se optou por limpar dados antes
+      if (clearBeforePopulate) {
+        // Buscar e excluir alunos do professor
+        const studentsSnapshot = await getDocs(
+          query(collection(db, 'students'), where('teacherId', '==', populateTeacherId))
+        );
+        for (const studentDoc of studentsSnapshot.docs) {
+          await deleteDoc(doc(db, 'students', studentDoc.id));
+        }
+
+        // Buscar e excluir aulas do professor
+        const lessonsSnapshot = await getDocs(
+          query(collection(db, 'lessons'), where('teacherId', '==', populateTeacherId))
+        );
+        for (const lessonDoc of lessonsSnapshot.docs) {
+          await deleteDoc(doc(db, 'lessons', lessonDoc.id));
+        }
+
+        // Buscar e excluir pagamentos do professor
+        const paymentsSnapshot = await getDocs(
+          query(collection(db, 'payments'), where('teacherId', '==', populateTeacherId))
+        );
+        for (const paymentDoc of paymentsSnapshot.docs) {
+          await deleteDoc(doc(db, 'payments', paymentDoc.id));
+        }
+      }
+
+      // Dados de exemplo para nomes de alunos
+      const firstNames = ['MARIA', 'JOSE', 'ANA', 'JOAO', 'FRANCISCO', 'ANTONIO', 'CARLOS', 'PAULO', 'PEDRO', 'LUCAS', 'MARCOS', 'LUIS', 'GABRIEL', 'RAFAEL', 'DANIEL', 'MARCELO', 'BRUNO', 'EDUARDO', 'FELIPE', 'RODRIGO', 'GUSTAVO', 'ANDRE', 'FERNANDO', 'FABIO', 'LEONARDO', 'DIEGO', 'MATHEUS', 'THIAGO', 'VINICIUS', 'CAIO'];
+      const lastNames = ['SILVA', 'SANTOS', 'OLIVEIRA', 'SOUSA', 'RODRIGUES', 'FERREIRA', 'ALVES', 'PEREIRA', 'LIMA', 'GOMES', 'COSTA', 'RIBEIRO', 'MARTINS', 'CARVALHO', 'ALMEIDA', 'LOPES', 'SOUSA', 'FERNANDES', 'PEREIRA', 'OLIVEIRA'];
+      const subjects = ['MATEMATICA', 'PORTUGUES', 'INGLES', 'FISICA', 'QUIMICA', 'BIOLOGIA', 'HISTORIA', 'GEOGRAFIA', 'FILOSOFIA', 'SOCIOLOGIA', 'REDAÇÃO', 'ESPANHOL'];
+      const contents = ['REVISAO GERAL', 'EXERCICIOS PRATICOS', 'PROVA APLICADA', 'DUVIDAS E REVISAO', 'CONTEUDO NOVO', 'SIMULADO', 'ATIVIDADE AVALIATIVA', 'REFORCO ESCOLAR', 'PREPARATORIO ENEM', 'EXERCICIOS DE FIXACAO', 'CORRECAO DE PROVA', 'ESTUDO DIRIGIDO'];
+
+      const startDate = parseISO(populateStartDate);
+      const endDate = parseISO(populateEndDate);
+      const teacher = teachers.find(t => t.id === populateTeacherId);
+
+      // Criar alunos
+      const createdStudents: { id: string; name: string; subject: string; monthlyFee: number }[] = [];
+      
+      for (let i = 0; i < populateStudentCount; i++) {
+        try {
+          const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+          const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+          const name = `${firstName} ${lastName}`;
+          const subject = subjects[Math.floor(Math.random() * subjects.length)];
+          const monthlyFee = Math.floor(Math.random() * 300) + 150; // Entre 150 e 450
+
+          const studentId = doc(collection(db, 'students')).id;
+          await setDoc(doc(db, 'students', studentId), {
+            name,
+            subject,
+            monthlyFee,
+            paymentDay: Math.floor(Math.random() * 28) + 1,
+            status: 'active',
+            chargeFee: true,
+            contractedLessons: populateLessonsPerStudent,
+            completedLessonsInCycle: 0,
+            teacherId: populateTeacherId,
+            startDate: populateStartDate,
+            phone: `(${Math.floor(Math.random() * 90) + 11}) 9${Math.floor(Math.random() * 9000)}-${Math.floor(Math.random() * 9000)}`,
+            createdAt: serverTimestamp(),
+            isPopulated: true,
+          });
+
+          createdStudents.push({ id: studentId, name, subject, monthlyFee });
+          results.students++;
+        } catch (error: any) {
+          results.errors.push(`Erro ao criar aluno ${i + 1}: ${error.message}`);
+        }
+      }
+
+      // Criar aulas para cada aluno
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      for (const student of createdStudents) {
+        const lessonsToCreate = Math.min(populateLessonsPerStudent, totalDays);
+        const daysBetweenLessons = Math.max(1, Math.floor(totalDays / lessonsToCreate));
+
+        for (let j = 0; j < lessonsToCreate; j++) {
+          try {
+            const lessonDate = new Date(startDate.getTime() + (j * daysBetweenLessons * 24 * 60 * 60 * 1000));
+            const content = contents[Math.floor(Math.random() * contents.length)];
+            const hour = Math.floor(Math.random() * 12) + 8; // Entre 8h e 20h
+            const minute = Math.random() > 0.5 ? '00' : '30';
+            const startTime = `${hour.toString().padStart(2, '0')}:${minute}`;
+
+            const lessonId = doc(collection(db, 'lessons')).id;
+            await setDoc(doc(db, 'lessons', lessonId), {
+              date: format(lessonDate, 'yyyy-MM-dd'),
+              startTime,
+              studentId: student.id,
+              studentName: student.name,
+              subject: student.subject,
+              contentCovered: content,
+              status: lessonDate <= new Date() ? 'completed' : 'scheduled',
+              endOfCycle: false,
+              teacherId: populateTeacherId,
+              createdAt: serverTimestamp(),
+              isPopulated: true,
+            });
+
+            results.lessons++;
+          } catch (error: any) {
+            results.errors.push(`Erro ao criar aula ${j + 1} para ${student.name}: ${error.message}`);
+          }
+        }
+      }
+
+      // Criar pagamentos para cada aluno
+      const months = [];
+      let currentMonth = startOfMonth(startDate);
+      while (currentMonth <= endDate) {
+        months.push(format(currentMonth, 'yyyy-MM'));
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      }
+
+      for (const student of createdStudents) {
+        for (const month of months) {
+          try {
+            // 70% de chance de pagamento realizado
+            const isPaid = Math.random() < 0.7;
+            const paymentDate = isPaid 
+              ? format(new Date(month + '-15'), 'yyyy-MM-dd') 
+              : null;
+
+            const paymentId = doc(collection(db, 'payments')).id;
+            await setDoc(doc(db, 'payments', paymentId), {
+              studentId: student.id,
+              studentName: student.name,
+              amount: student.monthlyFee,
+              paymentDate,
+              dueDate: format(new Date(month + '-10'), 'yyyy-MM-dd'),
+              status: isPaid ? 'paid' : (new Date(month + '-10') < new Date() ? 'overdue' : 'pending'),
+              referenceMonth: month,
+              teacherId: populateTeacherId,
+              createdAt: serverTimestamp(),
+              isPopulated: true,
+            });
+
+            results.payments++;
+          } catch (error: any) {
+            results.errors.push(`Erro ao criar pagamento para ${student.name} em ${month}: ${error.message}`);
+          }
+        }
+      }
+
+      setPopulateResults(results);
+      toast({
+        title: 'Dados Populados!',
+        description: `${results.students} alunos, ${results.lessons} aulas e ${results.payments} pagamentos criados.`,
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao popular dados',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPopulating(false);
+    }
+  };
+
   const filteredTeachers = teachers.filter((teacher) => {
     const matchesSearch = teacher.name?.toLowerCase().includes(search.toLowerCase()) ||
       teacher.email?.toLowerCase().includes(search.toLowerCase());
@@ -1978,6 +2174,14 @@ export default function AdminPage() {
               darkMode={darkMode}
             >
               Importar
+            </TabButton>
+            <TabButton
+              active={activeTab === 'populate'}
+              onClick={() => setActiveTab('populate')}
+              icon={Database}
+              darkMode={darkMode}
+            >
+              Popular Dados
             </TabButton>
           </div>
 
@@ -2269,6 +2473,273 @@ export default function AdminPage() {
                   </div>
                 </div>
               </motion.div>
+            </motion.div>
+          )}
+
+          {/* Populate Data Tab */}
+          {activeTab === 'populate' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-2xl shadow-sm border p-6 ${
+                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`p-3 rounded-xl ${darkMode ? 'bg-green-900/30' : 'bg-green-100'}`}>
+                  <Database className={`w-6 h-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
+                </div>
+                <div>
+                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Popular Dados de Demonstração
+                  </h2>
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Gere dados fictícios para testar o sistema
+                  </p>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-amber-900/20 border border-amber-700/50' : 'bg-amber-50 border border-amber-200'}`}>
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className={`w-5 h-5 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                  <div>
+                    <p className={`font-medium ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                      Atenção
+                    </p>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                      Esta funcionalidade irá criar dados fictícios para o professor selecionado. Se marcado, os dados existentes do professor serão excluídos antes de popular.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Selection */}
+                <div className="space-y-4">
+                  <div>
+                    <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Professor *
+                    </label>
+                    <select
+                      value={populateTeacherId}
+                      onChange={(e) => setPopulateTeacherId(e.target.value)}
+                      className={`w-full mt-2 px-4 py-2.5 rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-700 border-slate-600 text-white'
+                          : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <option value="">Selecione um professor...</option>
+                      {teachers
+                        .filter(t => t.role === 'teacher' || t.role === 'admin')
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                        .map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name} ({teacher.email}) {teacher.role === 'admin' ? '- ADMIN' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Data Inicial
+                      </label>
+                      <Input
+                        type="date"
+                        value={populateStartDate}
+                        onChange={(e) => setPopulateStartDate(e.target.value)}
+                        className={`mt-2 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Data Final
+                      </label>
+                      <Input
+                        type="date"
+                        value={populateEndDate}
+                        onChange={(e) => setPopulateEndDate(e.target.value)}
+                        className={`mt-2 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Clear before populate */}
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-red-900/20 border-red-700/50' : 'bg-red-50 border-red-200'}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={clearBeforePopulate}
+                        onChange={(e) => setClearBeforePopulate(e.target.checked)}
+                        className="w-5 h-5 mt-0.5 text-red-600 rounded"
+                      />
+                      <div>
+                        <span className={`font-medium ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                          Limpar dados existentes antes de popular
+                        </span>
+                        <p className={`text-sm mt-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                          Todos os alunos, aulas e pagamentos do professor selecionado serão excluídos permanentemente.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Right Column - Quantities */}
+                <div className="space-y-4">
+                  <div>
+                    <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Número de Alunos
+                    </label>
+                    <div className="flex items-center gap-4 mt-2">
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={populateStudentCount}
+                        onChange={(e) => setPopulateStudentCount(parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className={`font-bold text-lg w-8 text-center ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateStudentCount}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Aulas por Aluno
+                    </label>
+                    <div className="flex items-center gap-4 mt-2">
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={populateLessonsPerStudent}
+                        onChange={(e) => setPopulateLessonsPerStudent(parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className={`font-bold text-lg w-8 text-center ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateLessonsPerStudent}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'}`}>
+                    <h4 className={`font-medium mb-3 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                      Prévia dos Dados
+                    </h4>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className={`p-2 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                        <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {populateStudentCount}
+                        </p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alunos</p>
+                      </div>
+                      <div className={`p-2 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                        <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {populateStudentCount * populateLessonsPerStudent}
+                        </p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas</p>
+                      </div>
+                      <div className={`p-2 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                        <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          {populateStudentCount * 3}
+                        </p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pagamentos</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6">
+                <Button
+                  onClick={handlePopulateData}
+                  disabled={isPopulating || !populateTeacherId}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  {isPopulating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Populando Dados...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" /> Popular Dados
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPopulateTeacherId('');
+                    setPopulateStartDate(format(subMonths(new Date(), 2), 'yyyy-MM-dd'));
+                    setPopulateEndDate(format(new Date(), 'yyyy-MM-dd'));
+                    setPopulateStudentCount(5);
+                    setPopulateLessonsPerStudent(8);
+                    setClearBeforePopulate(true);
+                    setPopulateResults(null);
+                  }}
+                  disabled={isPopulating}
+                >
+                  Resetar
+                </Button>
+              </div>
+
+              {/* Results */}
+              {populateResults && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-6 p-4 rounded-xl ${
+                    darkMode ? 'bg-green-900/20 border border-green-700/50' : 'bg-green-50 border border-green-200'
+                  }`}
+                >
+                  <h3 className={`font-semibold mb-3 ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
+                    ✓ Dados Populados com Sucesso!
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateResults.students}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alunos Criados</p>
+                    </div>
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateResults.lessons}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas Criadas</p>
+                    </div>
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateResults.payments}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pagamentos</p>
+                    </div>
+                  </div>
+                  
+                  {populateResults.errors && populateResults.errors.length > 0 && (
+                    <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Avisos ({populateResults.errors.length}):
+                      </p>
+                      <div className="max-h-24 overflow-y-auto">
+                        {populateResults.errors.slice(0, 5).map((error: string, index: number) => (
+                          <p key={index} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            • {error}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
             </motion.div>
           )}
 

@@ -20,6 +20,7 @@ import {
   Wifi,
   WifiOff,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { doc, onSnapshot, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Alunos', href: '/students', icon: Users },
   { name: 'Aulas', href: '/lessons', icon: Calendar },
   { name: 'Financeiro', href: '/finance', icon: DollarSign },
+  { name: 'BI', href: '/bi', icon: BarChart3 },
 ];
 
 const adminNavigation = [
