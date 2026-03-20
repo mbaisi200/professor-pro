@@ -35,7 +35,7 @@ import {
   EyeOff,
   Database
 } from 'lucide-react';
-import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth, subMonths, addDays, getDay, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1118,8 +1118,9 @@ export default function AdminPage() {
   const [populateStartDate, setPopulateStartDate] = useState<string>(format(subMonths(new Date(), 2), 'yyyy-MM-dd'));
   const [populateEndDate, setPopulateEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [populateStudentCount, setPopulateStudentCount] = useState<number>(5);
-  const [populateLessonsPerStudent, setPopulateLessonsPerStudent] = useState<number>(8);
+  const [populateTotalLessons, setPopulateTotalLessons] = useState<number>(40);
   const [isPopulating, setIsPopulating] = useState<boolean>(false);
+  const [populateProgress, setPopulateProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [populateResults, setPopulateResults] = useState<any>(null);
   const { toast } = useToast();
 
@@ -1872,6 +1873,7 @@ export default function AdminPage() {
 
     setIsPopulating(true);
     setPopulateResults(null);
+    setPopulateProgress({ current: 0, total: 100, message: 'Iniciando...' });
 
     try {
       const results = {
@@ -1885,8 +1887,16 @@ export default function AdminPage() {
         errors: [] as string[],
       };
 
+      const totalSteps = 3 + populateStudentCount + populateTotalLessons + (populateStudentCount * 3);
+      let currentStep = 0;
+
+      const updateProgress = (message: string) => {
+        currentStep++;
+        setPopulateProgress({ current: currentStep, total: totalSteps, message });
+      };
+
       // SEMPRE limpar dados do professor antes de popular
-      // Buscar e excluir alunos do professor
+      updateProgress('Excluindo alunos antigos...');
       const studentsSnapshot = await getDocs(
         query(collection(db, 'students'), where('teacherId', '==', populateTeacherId))
       );
@@ -1894,7 +1904,7 @@ export default function AdminPage() {
         await deleteDoc(doc(db, 'students', studentDoc.id));
       }
 
-      // Buscar e excluir aulas do professor
+      updateProgress('Excluindo aulas antigas...');
       const lessonsSnapshot = await getDocs(
         query(collection(db, 'lessons'), where('teacherId', '==', populateTeacherId))
       );
@@ -1902,7 +1912,7 @@ export default function AdminPage() {
         await deleteDoc(doc(db, 'lessons', lessonDoc.id));
       }
 
-      // Buscar e excluir pagamentos do professor
+      updateProgress('Excluindo pagamentos antigos...');
       const paymentsSnapshot = await getDocs(
         query(collection(db, 'payments'), where('teacherId', '==', populateTeacherId))
       );
@@ -1915,21 +1925,36 @@ export default function AdminPage() {
       const lastNames = ['SILVA', 'SANTOS', 'OLIVEIRA', 'SOUSA', 'RODRIGUES', 'FERREIRA', 'ALVES', 'PEREIRA', 'LIMA', 'GOMES', 'COSTA', 'RIBEIRO', 'MARTINS', 'CARVALHO', 'ALMEIDA', 'LOPES', 'SOUSA', 'FERNANDES', 'PEREIRA', 'OLIVEIRA'];
       const subjects = ['MATEMATICA', 'PORTUGUES', 'INGLES', 'FISICA', 'QUIMICA', 'BIOLOGIA', 'HISTORIA', 'GEOGRAFIA', 'FILOSOFIA', 'SOCIOLOGIA', 'REDAÇÃO', 'ESPANHOL'];
       const contents = ['REVISAO GERAL', 'EXERCICIOS PRATICOS', 'PROVA APLICADA', 'DUVIDAS E REVISAO', 'CONTEUDO NOVO', 'SIMULADO', 'ATIVIDADE AVALIATIVA', 'REFORCO ESCOLAR', 'PREPARATORIO ENEM', 'EXERCICIOS DE FIXACAO', 'CORRECAO DE PROVA', 'ESTUDO DIRIGIDO'];
+      const hours = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
 
       const startDate = parseISO(populateStartDate);
       const endDate = parseISO(populateEndDate);
-      const teacher = teachers.find(t => t.id === populateTeacherId);
+      const today = new Date();
+
+      // Gerar lista de dias úteis (segunda a sexta) no período
+      const weekdays: Date[] = [];
+      let currentDate = startDate;
+      while (currentDate <= endDate) {
+        const dayOfWeek = getDay(currentDate);
+        // 1 = segunda, 2 = terça, 3 = quarta, 4 = quinta, 5 = sexta
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          weekdays.push(new Date(currentDate));
+        }
+        currentDate = addDays(currentDate, 1);
+      }
 
       // Criar alunos com diferentes estados
       const createdStudents: { id: string; name: string; subject: string; monthlyFee: number; status: string }[] = [];
       
       for (let i = 0; i < populateStudentCount; i++) {
         try {
+          updateProgress(`Criando aluno ${i + 1}/${populateStudentCount}...`);
+          
           const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
           const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
           const name = `${firstName} ${lastName}`;
           const subject = subjects[Math.floor(Math.random() * subjects.length)];
-          const monthlyFee = Math.floor(Math.random() * 300) + 150; // Entre 150 e 450
+          const monthlyFee = Math.floor(Math.random() * 300) + 150;
           
           // 15% de chance de aluno inativo (para simular retenção)
           const isInactive = Math.random() < 0.15;
@@ -1943,8 +1968,8 @@ export default function AdminPage() {
             paymentDay: Math.floor(Math.random() * 28) + 1,
             status: studentStatus,
             chargeFee: true,
-            contractedLessons: populateLessonsPerStudent,
-            completedLessonsInCycle: isInactive ? 0 : Math.floor(Math.random() * populateLessonsPerStudent),
+            contractedLessons: Math.ceil(populateTotalLessons / populateStudentCount),
+            completedLessonsInCycle: isInactive ? 0 : Math.floor(Math.random() * Math.ceil(populateTotalLessons / populateStudentCount)),
             teacherId: populateTeacherId,
             startDate: populateStartDate,
             phone: `(${Math.floor(Math.random() * 90) + 11}) 9${Math.floor(Math.random() * 9000)}-${Math.floor(Math.random() * 9000)}`,
@@ -1960,71 +1985,66 @@ export default function AdminPage() {
         }
       }
 
-      // Criar aulas para cada aluno com status variados
-      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const today = new Date();
+      // Distribuir aulas em dias úteis de forma equilibrada entre alunos
+      const lessonsPerStudent = Math.ceil(populateTotalLessons / createdStudents.length);
+      let lessonIndex = 0;
       
-      for (const student of createdStudents) {
-        // Alunos inativos têm menos aulas
-        const lessonsToCreate = student.status === 'inactive' 
-          ? Math.max(1, Math.floor(populateLessonsPerStudent * 0.3))
-          : populateLessonsPerStudent;
-        const daysBetweenLessons = Math.max(1, Math.floor(totalDays / lessonsToCreate));
+      for (let i = 0; i < populateTotalLessons && weekdays.length > 0; i++) {
+        try {
+          const studentIndex = i % createdStudents.length;
+          const student = createdStudents[studentIndex];
+          
+          // Escolher um dia útil (distribuir uniformemente)
+          const weekdayIndex = Math.floor((i / populateTotalLessons) * weekdays.length);
+          const lessonDate = weekdays[Math.min(weekdayIndex, weekdays.length - 1)];
+          
+          updateProgress(`Criando aula ${i + 1}/${populateTotalLessons} - ${student.name}...`);
+          
+          const content = contents[Math.floor(Math.random() * contents.length)];
+          const startTime = hours[Math.floor(Math.random() * hours.length)];
 
-        for (let j = 0; j < lessonsToCreate; j++) {
-          try {
-            const lessonDate = new Date(startDate.getTime() + (j * daysBetweenLessons * 24 * 60 * 60 * 1000));
-            const content = contents[Math.floor(Math.random() * contents.length)];
-            const hour = Math.floor(Math.random() * 12) + 8; // Entre 8h e 20h
-            const minute = Math.random() > 0.5 ? '00' : '30';
-            const startTime = `${hour.toString().padStart(2, '0')}:${minute}`;
-
-            // Definir status da aula com distribuição realista
-            let lessonStatus: string;
-            const isPastLesson = lessonDate <= today;
-            
-            if (student.status === 'inactive' && isPastLesson && j >= lessonsToCreate - 2) {
-              // Alunos inativos têm mais cancelamentos no final
-              lessonStatus = Math.random() < 0.7 ? 'cancelled' : 'completed';
-            } else if (isPastLesson) {
-              // Aulas passadas: 75% concluídas, 15% canceladas, 10% remarcadas
-              const rand = Math.random();
-              if (rand < 0.75) lessonStatus = 'completed';
-              else if (rand < 0.90) lessonStatus = 'cancelled';
-              else lessonStatus = 'rescheduled';
-            } else {
-              // Aulas futuras: 85% agendadas, 10% remarcadas, 5% canceladas
-              const rand = Math.random();
-              if (rand < 0.85) lessonStatus = 'scheduled';
-              else if (rand < 0.95) lessonStatus = 'rescheduled';
-              else lessonStatus = 'cancelled';
-            }
-
-            const lessonId = doc(collection(db, 'lessons')).id;
-            await setDoc(doc(db, 'lessons', lessonId), {
-              date: format(lessonDate, 'yyyy-MM-dd'),
-              startTime,
-              studentId: student.id,
-              studentName: student.name,
-              subject: student.subject,
-              contentCovered: lessonStatus === 'completed' ? content : null,
-              status: lessonStatus,
-              endOfCycle: false,
-              teacherId: populateTeacherId,
-              createdAt: serverTimestamp(),
-              isPopulated: true,
-            });
-
-            results.lessons++;
-            if (lessonStatus === 'cancelled') results.cancelledLessons++;
-            if (lessonStatus === 'scheduled') results.scheduledLessons++;
-          } catch (error: any) {
-            results.errors.push(`Erro ao criar aula ${j + 1} para ${student.name}: ${error.message}`);
+          // Definir status da aula com distribuição realista
+          let lessonStatus: string;
+          const isPastLesson = lessonDate <= today;
+          
+          if (student.status === 'inactive' && isPastLesson && Math.random() < 0.5) {
+            lessonStatus = 'cancelled';
+          } else if (isPastLesson) {
+            const rand = Math.random();
+            if (rand < 0.75) lessonStatus = 'completed';
+            else if (rand < 0.90) lessonStatus = 'cancelled';
+            else lessonStatus = 'rescheduled';
+          } else {
+            const rand = Math.random();
+            if (rand < 0.85) lessonStatus = 'scheduled';
+            else if (rand < 0.95) lessonStatus = 'rescheduled';
+            else lessonStatus = 'cancelled';
           }
+
+          const lessonId = doc(collection(db, 'lessons')).id;
+          await setDoc(doc(db, 'lessons', lessonId), {
+            date: format(lessonDate, 'yyyy-MM-dd'),
+            startTime,
+            studentId: student.id,
+            studentName: student.name,
+            subject: student.subject,
+            contentCovered: lessonStatus === 'completed' ? content : null,
+            status: lessonStatus,
+            endOfCycle: false,
+            teacherId: populateTeacherId,
+            createdAt: serverTimestamp(),
+            isPopulated: true,
+          });
+
+          results.lessons++;
+          if (lessonStatus === 'cancelled') results.cancelledLessons++;
+          if (lessonStatus === 'scheduled') results.scheduledLessons++;
+        } catch (error: any) {
+          results.errors.push(`Erro ao criar aula ${i + 1}: ${error.message}`);
         }
       }
 
-      // Criar pagamentos para cada aluno com situações variadas
+      // Criar pagamentos para cada aluno
       const months = [];
       let currentMonth = startOfMonth(startDate);
       while (currentMonth <= endDate) {
@@ -2033,24 +2053,22 @@ export default function AdminPage() {
       }
 
       for (const student of createdStudents) {
-        // Alunos inativos podem ter pagamentos faltando
         const monthsToPay = student.status === 'inactive' 
-          ? months.slice(0, Math.floor(months.length * 0.5)) // Pagou apenas metade
+          ? months.slice(0, Math.floor(months.length * 0.5))
           : months;
 
         for (const month of monthsToPay) {
           try {
-            // Determinar status do pagamento com situações variadas
+            updateProgress(`Criando pagamento - ${student.name} (${month})...`);
+            
             let paymentStatus: string;
             let paymentDate: string | null = null;
             const monthDueDate = new Date(month + '-10');
             const isPastDue = monthDueDate < today;
 
             if (student.status === 'inactive' && months.indexOf(month) >= monthsToPay.length - 1) {
-              // Aluno inativo: último mês não foi pago (motivo da inativação)
               paymentStatus = isPastDue ? 'overdue' : 'pending';
             } else if (isPastDue) {
-              // Meses passados: 65% pago, 20% atrasado, 15% pendente
               const rand = Math.random();
               if (rand < 0.65) {
                 paymentStatus = 'paid';
@@ -2061,7 +2079,6 @@ export default function AdminPage() {
                 paymentStatus = 'pending';
               }
             } else {
-              // Meses futuros ou atual: 30% já pago, resto pendente
               const rand = Math.random();
               if (rand < 0.30) {
                 paymentStatus = 'paid';
@@ -2094,6 +2111,7 @@ export default function AdminPage() {
       }
 
       setPopulateResults(results);
+      setPopulateProgress({ current: totalSteps, total: totalSteps, message: 'Concluído!' });
       toast({
         title: 'Dados Populados!',
         description: `${results.students} alunos, ${results.lessons} aulas e ${results.payments} pagamentos criados.`,
@@ -2107,6 +2125,7 @@ export default function AdminPage() {
       });
     } finally {
       setIsPopulating(false);
+      setPopulateProgress(null);
     }
   };
 
@@ -2655,21 +2674,25 @@ export default function AdminPage() {
 
                   <div>
                     <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Aulas por Aluno
+                      Total de Aulas (Segunda a Sexta)
                     </label>
                     <div className="flex items-center gap-4 mt-2">
                       <input
                         type="range"
-                        min="1"
-                        max="20"
-                        value={populateLessonsPerStudent}
-                        onChange={(e) => setPopulateLessonsPerStudent(parseInt(e.target.value))}
+                        min="5"
+                        max="100"
+                        step="5"
+                        value={populateTotalLessons}
+                        onChange={(e) => setPopulateTotalLessons(parseInt(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                       />
-                      <span className={`font-bold text-lg w-8 text-center ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                        {populateLessonsPerStudent}
+                      <span className={`font-bold text-lg w-12 text-center ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                        {populateTotalLessons}
                       </span>
                     </div>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Distribuídas em dias úteis (seg-sex)
+                    </p>
                   </div>
 
                   {/* Preview */}
@@ -2686,7 +2709,7 @@ export default function AdminPage() {
                       </div>
                       <div className={`p-2 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
                         <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                          {populateStudentCount * populateLessonsPerStudent}
+                          {populateTotalLessons}
                         </p>
                         <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas</p>
                       </div>
@@ -2705,6 +2728,37 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Progress Bar */}
+              {isPopulating && populateProgress && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`mt-6 p-4 rounded-xl ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-700'}`}>
+                      {populateProgress.message}
+                    </span>
+                    <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {Math.round((populateProgress.current / populateProgress.total) * 100)}%
+                    </span>
+                  </div>
+                  <div className={`h-3 rounded-full overflow-hidden ${darkMode ? 'bg-slate-600' : 'bg-slate-200'}`}>
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(populateProgress.current / populateProgress.total) * 100}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-2">
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {populateProgress.current} de {populateProgress.total} operações
+                    </span>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 mt-6">
@@ -2730,7 +2784,7 @@ export default function AdminPage() {
                     setPopulateStartDate(format(subMonths(new Date(), 2), 'yyyy-MM-dd'));
                     setPopulateEndDate(format(new Date(), 'yyyy-MM-dd'));
                     setPopulateStudentCount(5);
-                    setPopulateLessonsPerStudent(8);
+                    setPopulateTotalLessons(40);
                     setPopulateResults(null);
                   }}
                   disabled={isPopulating}
