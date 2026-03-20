@@ -381,11 +381,17 @@ function CustomTooltip({ active, payload, label, darkMode }: any) {
         darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : entry.value}
-          </p>
-        ))}
+        {payload.map((entry: any, index: number) => {
+          const numValue = Number(entry.value);
+          const isMonetary = entry.dataKey === 'receita' || entry.dataKey === 'esperado' || entry.name?.toLowerCase().includes('receita') || entry.name?.toLowerCase().includes('valor');
+          return (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {isMonetary && !isNaN(numValue) 
+                ? numValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) 
+                : !isNaN(numValue) ? numValue : entry.value}
+            </p>
+          );
+        })}
       </div>
     );
   }
@@ -471,13 +477,13 @@ export default function BIPage() {
   const monthlyRevenue = useMemo(() => {
     return payments
       .filter(p => p.status === 'paid' && p.referenceMonth === currentMonth)
-      .reduce((sum, p) => sum + (p.amount || 0), 0);
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   }, [payments, currentMonth]);
 
   const expectedRevenue = useMemo(() => {
     return activeStudents
       .filter(s => s.chargeFee !== false && s.monthlyFee)
-      .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+      .reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0);
   }, [activeStudents]);
 
   const pendingRevenue = useMemo(() => {
@@ -489,7 +495,7 @@ export default function BIPage() {
         );
         return !hasPayment;
       })
-      .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+      .reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0);
   }, [activeStudents, payments, currentMonth]);
 
   const overdueRevenue = useMemo(() => {
@@ -499,10 +505,10 @@ export default function BIPage() {
         const hasPayment = payments.some(
           p => p.studentId === s.id && p.referenceMonth === currentMonth && p.status === 'paid'
         );
-        const isOverdue = today.getDate() > (s.paymentDay || 0);
+        const isOverdue = today.getDate() > (Number(s.paymentDay) || 0);
         return !hasPayment && isOverdue;
       })
-      .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+      .reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0);
   }, [activeStudents, payments, currentMonth, today]);
 
   // Collection rate
@@ -543,11 +549,11 @@ export default function BIPage() {
 
       const revenue = payments
         .filter(p => p.status === 'paid' && p.referenceMonth === monthKey)
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
       const expected = students
         .filter(s => s.chargeFee !== false && s.monthlyFee)
-        .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+        .reduce((sum, s) => sum + (Number(s.monthlyFee) || 0), 0);
 
       months.push({
         month: monthLabel,
@@ -671,15 +677,18 @@ export default function BIPage() {
   // Students near end of cycle
   const studentsNearEndOfCycle = useMemo(() => {
     return activeStudents.filter(s => {
-      if (!s.contractedLessons || s.contractedLessons <= 0) return false;
-      const remaining = s.contractedLessons - (s.completedLessonsInCycle || 0);
+      const contracted = Number(s.contractedLessons) || 0;
+      if (contracted <= 0) return false;
+      const completed = Number(s.completedLessonsInCycle) || 0;
+      const remaining = contracted - completed;
       return remaining <= 2 && remaining > 0;
     });
   }, [activeStudents]);
 
   // Average ticket
-  const averageTicket = activeStudents.length > 0
-    ? expectedRevenue / activeStudents.filter(s => s.chargeFee !== false).length
+  const activeStudentsWithFee = activeStudents.filter(s => s.chargeFee !== false);
+  const averageTicket = activeStudentsWithFee.length > 0
+    ? expectedRevenue / activeStudentsWithFee.length
     : 0;
 
   // Completion rate
@@ -730,7 +739,7 @@ export default function BIPage() {
         title: 'Gestor Financeiro',
         description: 'R$ 5.000 em receitas',
         icon: DollarSign,
-        unlocked: payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + (p.amount || 0), 0) >= 5000,
+        unlocked: payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + (Number(p.amount) || 0), 0) >= 5000,
       },
       {
         title: 'Excelência',
@@ -1142,7 +1151,7 @@ export default function BIPage() {
                     align="center"
                     formatter={(value, entry: any) => (
                       <span className={darkMode ? 'text-gray-300' : 'text-slate-600'} style={{ fontSize: 12 }}>
-                        {entry.name}: {entry.value.toFixed(0)}%
+                        {entry.name}: {Number(entry.value).toFixed(0)}%
                       </span>
                     )}
                   />
