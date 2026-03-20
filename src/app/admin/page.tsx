@@ -1119,7 +1119,6 @@ export default function AdminPage() {
   const [populateEndDate, setPopulateEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [populateStudentCount, setPopulateStudentCount] = useState<number>(5);
   const [populateLessonsPerStudent, setPopulateLessonsPerStudent] = useState<number>(8);
-  const [clearBeforePopulate, setClearBeforePopulate] = useState<boolean>(true);
   const [isPopulating, setIsPopulating] = useState<boolean>(false);
   const [populateResults, setPopulateResults] = useState<any>(null);
   const { toast } = useToast();
@@ -1879,34 +1878,36 @@ export default function AdminPage() {
         students: 0,
         lessons: 0,
         payments: 0,
+        cancelledLessons: 0,
+        scheduledLessons: 0,
+        overduePayments: 0,
+        inactiveStudents: 0,
         errors: [] as string[],
       };
 
-      // Se optou por limpar dados antes
-      if (clearBeforePopulate) {
-        // Buscar e excluir alunos do professor
-        const studentsSnapshot = await getDocs(
-          query(collection(db, 'students'), where('teacherId', '==', populateTeacherId))
-        );
-        for (const studentDoc of studentsSnapshot.docs) {
-          await deleteDoc(doc(db, 'students', studentDoc.id));
-        }
+      // SEMPRE limpar dados do professor antes de popular
+      // Buscar e excluir alunos do professor
+      const studentsSnapshot = await getDocs(
+        query(collection(db, 'students'), where('teacherId', '==', populateTeacherId))
+      );
+      for (const studentDoc of studentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'students', studentDoc.id));
+      }
 
-        // Buscar e excluir aulas do professor
-        const lessonsSnapshot = await getDocs(
-          query(collection(db, 'lessons'), where('teacherId', '==', populateTeacherId))
-        );
-        for (const lessonDoc of lessonsSnapshot.docs) {
-          await deleteDoc(doc(db, 'lessons', lessonDoc.id));
-        }
+      // Buscar e excluir aulas do professor
+      const lessonsSnapshot = await getDocs(
+        query(collection(db, 'lessons'), where('teacherId', '==', populateTeacherId))
+      );
+      for (const lessonDoc of lessonsSnapshot.docs) {
+        await deleteDoc(doc(db, 'lessons', lessonDoc.id));
+      }
 
-        // Buscar e excluir pagamentos do professor
-        const paymentsSnapshot = await getDocs(
-          query(collection(db, 'payments'), where('teacherId', '==', populateTeacherId))
-        );
-        for (const paymentDoc of paymentsSnapshot.docs) {
-          await deleteDoc(doc(db, 'payments', paymentDoc.id));
-        }
+      // Buscar e excluir pagamentos do professor
+      const paymentsSnapshot = await getDocs(
+        query(collection(db, 'payments'), where('teacherId', '==', populateTeacherId))
+      );
+      for (const paymentDoc of paymentsSnapshot.docs) {
+        await deleteDoc(doc(db, 'payments', paymentDoc.id));
       }
 
       // Dados de exemplo para nomes de alunos
@@ -1919,8 +1920,8 @@ export default function AdminPage() {
       const endDate = parseISO(populateEndDate);
       const teacher = teachers.find(t => t.id === populateTeacherId);
 
-      // Criar alunos
-      const createdStudents: { id: string; name: string; subject: string; monthlyFee: number }[] = [];
+      // Criar alunos com diferentes estados
+      const createdStudents: { id: string; name: string; subject: string; monthlyFee: number; status: string }[] = [];
       
       for (let i = 0; i < populateStudentCount; i++) {
         try {
@@ -1929,6 +1930,10 @@ export default function AdminPage() {
           const name = `${firstName} ${lastName}`;
           const subject = subjects[Math.floor(Math.random() * subjects.length)];
           const monthlyFee = Math.floor(Math.random() * 300) + 150; // Entre 150 e 450
+          
+          // 15% de chance de aluno inativo (para simular retenção)
+          const isInactive = Math.random() < 0.15;
+          const studentStatus = isInactive ? 'inactive' : 'active';
 
           const studentId = doc(collection(db, 'students')).id;
           await setDoc(doc(db, 'students', studentId), {
@@ -1936,10 +1941,10 @@ export default function AdminPage() {
             subject,
             monthlyFee,
             paymentDay: Math.floor(Math.random() * 28) + 1,
-            status: 'active',
+            status: studentStatus,
             chargeFee: true,
             contractedLessons: populateLessonsPerStudent,
-            completedLessonsInCycle: 0,
+            completedLessonsInCycle: isInactive ? 0 : Math.floor(Math.random() * populateLessonsPerStudent),
             teacherId: populateTeacherId,
             startDate: populateStartDate,
             phone: `(${Math.floor(Math.random() * 90) + 11}) 9${Math.floor(Math.random() * 9000)}-${Math.floor(Math.random() * 9000)}`,
@@ -1947,18 +1952,23 @@ export default function AdminPage() {
             isPopulated: true,
           });
 
-          createdStudents.push({ id: studentId, name, subject, monthlyFee });
+          createdStudents.push({ id: studentId, name, subject, monthlyFee, status: studentStatus });
           results.students++;
+          if (isInactive) results.inactiveStudents++;
         } catch (error: any) {
           results.errors.push(`Erro ao criar aluno ${i + 1}: ${error.message}`);
         }
       }
 
-      // Criar aulas para cada aluno
+      // Criar aulas para cada aluno com status variados
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const today = new Date();
       
       for (const student of createdStudents) {
-        const lessonsToCreate = Math.min(populateLessonsPerStudent, totalDays);
+        // Alunos inativos têm menos aulas
+        const lessonsToCreate = student.status === 'inactive' 
+          ? Math.max(1, Math.floor(populateLessonsPerStudent * 0.3))
+          : populateLessonsPerStudent;
         const daysBetweenLessons = Math.max(1, Math.floor(totalDays / lessonsToCreate));
 
         for (let j = 0; j < lessonsToCreate; j++) {
@@ -1969,6 +1979,27 @@ export default function AdminPage() {
             const minute = Math.random() > 0.5 ? '00' : '30';
             const startTime = `${hour.toString().padStart(2, '0')}:${minute}`;
 
+            // Definir status da aula com distribuição realista
+            let lessonStatus: string;
+            const isPastLesson = lessonDate <= today;
+            
+            if (student.status === 'inactive' && isPastLesson && j >= lessonsToCreate - 2) {
+              // Alunos inativos têm mais cancelamentos no final
+              lessonStatus = Math.random() < 0.7 ? 'cancelled' : 'completed';
+            } else if (isPastLesson) {
+              // Aulas passadas: 75% concluídas, 15% canceladas, 10% remarcadas
+              const rand = Math.random();
+              if (rand < 0.75) lessonStatus = 'completed';
+              else if (rand < 0.90) lessonStatus = 'cancelled';
+              else lessonStatus = 'rescheduled';
+            } else {
+              // Aulas futuras: 85% agendadas, 10% remarcadas, 5% canceladas
+              const rand = Math.random();
+              if (rand < 0.85) lessonStatus = 'scheduled';
+              else if (rand < 0.95) lessonStatus = 'rescheduled';
+              else lessonStatus = 'cancelled';
+            }
+
             const lessonId = doc(collection(db, 'lessons')).id;
             await setDoc(doc(db, 'lessons', lessonId), {
               date: format(lessonDate, 'yyyy-MM-dd'),
@@ -1976,8 +2007,8 @@ export default function AdminPage() {
               studentId: student.id,
               studentName: student.name,
               subject: student.subject,
-              contentCovered: content,
-              status: lessonDate <= new Date() ? 'completed' : 'scheduled',
+              contentCovered: lessonStatus === 'completed' ? content : null,
+              status: lessonStatus,
               endOfCycle: false,
               teacherId: populateTeacherId,
               createdAt: serverTimestamp(),
@@ -1985,13 +2016,15 @@ export default function AdminPage() {
             });
 
             results.lessons++;
+            if (lessonStatus === 'cancelled') results.cancelledLessons++;
+            if (lessonStatus === 'scheduled') results.scheduledLessons++;
           } catch (error: any) {
             results.errors.push(`Erro ao criar aula ${j + 1} para ${student.name}: ${error.message}`);
           }
         }
       }
 
-      // Criar pagamentos para cada aluno
+      // Criar pagamentos para cada aluno com situações variadas
       const months = [];
       let currentMonth = startOfMonth(startDate);
       while (currentMonth <= endDate) {
@@ -2000,13 +2033,43 @@ export default function AdminPage() {
       }
 
       for (const student of createdStudents) {
-        for (const month of months) {
+        // Alunos inativos podem ter pagamentos faltando
+        const monthsToPay = student.status === 'inactive' 
+          ? months.slice(0, Math.floor(months.length * 0.5)) // Pagou apenas metade
+          : months;
+
+        for (const month of monthsToPay) {
           try {
-            // 70% de chance de pagamento realizado
-            const isPaid = Math.random() < 0.7;
-            const paymentDate = isPaid 
-              ? format(new Date(month + '-15'), 'yyyy-MM-dd') 
-              : null;
+            // Determinar status do pagamento com situações variadas
+            let paymentStatus: string;
+            let paymentDate: string | null = null;
+            const monthDueDate = new Date(month + '-10');
+            const isPastDue = monthDueDate < today;
+
+            if (student.status === 'inactive' && months.indexOf(month) >= monthsToPay.length - 1) {
+              // Aluno inativo: último mês não foi pago (motivo da inativação)
+              paymentStatus = isPastDue ? 'overdue' : 'pending';
+            } else if (isPastDue) {
+              // Meses passados: 65% pago, 20% atrasado, 15% pendente
+              const rand = Math.random();
+              if (rand < 0.65) {
+                paymentStatus = 'paid';
+                paymentDate = format(new Date(month + '-' + (Math.floor(Math.random() * 10) + 5)), 'yyyy-MM-dd');
+              } else if (rand < 0.85) {
+                paymentStatus = 'overdue';
+              } else {
+                paymentStatus = 'pending';
+              }
+            } else {
+              // Meses futuros ou atual: 30% já pago, resto pendente
+              const rand = Math.random();
+              if (rand < 0.30) {
+                paymentStatus = 'paid';
+                paymentDate = format(new Date(), 'yyyy-MM-dd');
+              } else {
+                paymentStatus = 'pending';
+              }
+            }
 
             const paymentId = doc(collection(db, 'payments')).id;
             await setDoc(doc(db, 'payments', paymentId), {
@@ -2015,7 +2078,7 @@ export default function AdminPage() {
               amount: student.monthlyFee,
               paymentDate,
               dueDate: format(new Date(month + '-10'), 'yyyy-MM-dd'),
-              status: isPaid ? 'paid' : (new Date(month + '-10') < new Date() ? 'overdue' : 'pending'),
+              status: paymentStatus,
               referenceMonth: month,
               teacherId: populateTeacherId,
               createdAt: serverTimestamp(),
@@ -2023,6 +2086,7 @@ export default function AdminPage() {
             });
 
             results.payments++;
+            if (paymentStatus === 'overdue') results.overduePayments++;
           } catch (error: any) {
             results.errors.push(`Erro ao criar pagamento para ${student.name} em ${month}: ${error.message}`);
           }
@@ -2500,15 +2564,15 @@ export default function AdminPage() {
               </div>
 
               {/* Warning */}
-              <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-amber-900/20 border border-amber-700/50' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className={`p-4 rounded-xl mb-6 ${darkMode ? 'bg-red-900/20 border border-red-700/50' : 'bg-red-50 border border-red-200'}`}>
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className={`w-5 h-5 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
+                  <AlertTriangle className={`w-5 h-5 mt-0.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
                   <div>
-                    <p className={`font-medium ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
-                      Atenção
+                    <p className={`font-medium ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                      ⚠️ Importante - Dados serão substituídos!
                     </p>
-                    <p className={`text-sm mt-1 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                      Esta funcionalidade irá criar dados fictícios para o professor selecionado. Se marcado, os dados existentes do professor serão excluídos antes de popular.
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                      Ao popular os dados, <strong>todos os alunos, aulas e pagamentos existentes</strong> do professor selecionado serão <strong>excluídos permanentemente</strong> antes de criar os novos dados de demonstração.
                     </p>
                   </div>
                 </div>
@@ -2566,26 +2630,6 @@ export default function AdminPage() {
                       />
                     </div>
                   </div>
-
-                  {/* Clear before populate */}
-                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-red-900/20 border-red-700/50' : 'bg-red-50 border-red-200'}`}>
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={clearBeforePopulate}
-                        onChange={(e) => setClearBeforePopulate(e.target.checked)}
-                        className="w-5 h-5 mt-0.5 text-red-600 rounded"
-                      />
-                      <div>
-                        <span className={`font-medium ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-                          Limpar dados existentes antes de popular
-                        </span>
-                        <p className={`text-sm mt-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                          Todos os alunos, aulas e pagamentos do professor selecionado serão excluídos permanentemente.
-                        </p>
-                      </div>
-                    </label>
-                  </div>
                 </div>
 
                 {/* Right Column - Quantities */}
@@ -2631,9 +2675,9 @@ export default function AdminPage() {
                   {/* Preview */}
                   <div className={`p-4 rounded-xl border ${darkMode ? 'bg-blue-900/20 border-blue-700/50' : 'bg-blue-50 border-blue-200'}`}>
                     <h4 className={`font-medium mb-3 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                      Prévia dos Dados
+                      📊 Prévia dos Dados que serão criados
                     </h4>
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-3 gap-3 text-center mb-3">
                       <div className={`p-2 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
                         <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                           {populateStudentCount}
@@ -2652,6 +2696,11 @@ export default function AdminPage() {
                         </p>
                         <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pagamentos</p>
                       </div>
+                    </div>
+                    <div className={`text-xs ${darkMode ? 'text-blue-400' : 'text-blue-600'} space-y-1`}>
+                      <p>• <strong>Aulas:</strong> ~75% concluídas, ~15% canceladas, ~10% remarcadas</p>
+                      <p>• <strong>Pagamentos:</strong> ~65% pagos, ~20% atrasados, ~15% pendentes</p>
+                      <p>• <strong>Alunos:</strong> ~15% inativos (simulando retenção)</p>
                     </div>
                   </div>
                 </div>
@@ -2682,7 +2731,6 @@ export default function AdminPage() {
                     setPopulateEndDate(format(new Date(), 'yyyy-MM-dd'));
                     setPopulateStudentCount(5);
                     setPopulateLessonsPerStudent(8);
-                    setClearBeforePopulate(true);
                     setPopulateResults(null);
                   }}
                   disabled={isPopulating}
@@ -2703,24 +2751,42 @@ export default function AdminPage() {
                   <h3 className={`font-semibold mb-3 ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
                     ✓ Dados Populados com Sucesso!
                   </h3>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                     <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
                       <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                         {populateResults.students}
                       </p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alunos Criados</p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alunos</p>
                     </div>
                     <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
                       <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                         {populateResults.lessons}
                       </p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas Criadas</p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas</p>
                     </div>
                     <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
                       <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                         {populateResults.payments}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pagamentos</p>
+                    </div>
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-xl font-bold text-rose-500`}>
+                        {populateResults.cancelledLessons}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Canceladas</p>
+                    </div>
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-xl font-bold text-amber-500`}>
+                        {populateResults.overduePayments}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Atrasados</p>
+                    </div>
+                    <div className={`text-center p-3 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-xl font-bold text-slate-400`}>
+                        {populateResults.inactiveStudents}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Inativos</p>
                     </div>
                   </div>
                   
