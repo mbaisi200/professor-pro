@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -19,6 +19,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  RefreshCw,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -35,7 +36,13 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { firestoreService, COLLECTIONS } from '@/lib/firestore-helpers';
+import { 
+  usePayments, 
+  useStudents, 
+  useCreatePayment, 
+  useUpdatePayment, 
+  useDeletePayment 
+} from '@/hooks/useFirestore';
 
 interface Payment {
   id: string;
@@ -240,9 +247,6 @@ function SortIcon({ field, sortField, sortDirection }: { field: string; sortFiel
 export default function FinancePage() {
   const { resolvedTheme } = useTheme();
   const darkMode = resolvedTheme === 'dark';
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -256,6 +260,15 @@ export default function FinancePage() {
   const { user, loading, userData } = useAuth();
   const router = useRouter();
 
+  // Usar hooks React Query para buscar dados
+  const teacherId = userData?.id || null;
+  const { data: paymentsData = [], isLoading: isLoadingPayments, refetch: refetchPayments } = usePayments(teacherId);
+  const { data: studentsData = [], isLoading: isLoadingStudents, refetch: refetchStudents } = useStudents(teacherId);
+
+  const createPaymentMutation = useCreatePayment();
+  const updatePaymentMutation = useUpdatePayment();
+  const deletePaymentMutation = useDeletePayment();
+
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
@@ -263,64 +276,45 @@ export default function FinancePage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
-    } else if (user && userData?.id) {
-      fetchData();
     }
-  }, [user, loading, router, userData]);
+  }, [user, loading, router]);
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [paymentsData, studentsData] = await Promise.all([
-        firestoreService.getAll<Payment>(COLLECTIONS.PAYMENTS),
-        firestoreService.getAll<Student>(COLLECTIONS.STUDENTS),
-      ]);
-
-      if (userData?.id) {
-        const teacherPayments = paymentsData.filter(p => p.teacherId === userData.id);
-        const teacherStudents = studentsData.filter(s => s.teacherId === userData.id);
+  // Gerar pagamentos pendentes automáticos para alunos ativos com mensalidade
+  const payments = useMemo(() => {
+    const currentMonth = format(new Date(), 'yyyy-MM');
+    const pendingPaymentsGenerated: Payment[] = [];
+    
+    studentsData
+      .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
+      .forEach(student => {
+        // Verificar se já existe pagamento para este aluno no mês atual
+        const existingPayment = paymentsData.find(
+          p => p.studentId === student.id && p.referenceMonth === currentMonth
+        );
         
-        // Gerar pagamentos pendentes automáticos para alunos ativos com mensalidade
-        const currentMonth = format(new Date(), 'yyyy-MM');
-        const pendingPaymentsGenerated: Payment[] = [];
-        
-        teacherStudents
-          .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee && s.paymentDay)
-          .forEach(student => {
-            // Verificar se já existe pagamento para este aluno no mês atual
-            const existingPayment = teacherPayments.find(
-              p => p.studentId === student.id && p.referenceMonth === currentMonth
-            );
-            
-            if (!existingPayment) {
-              // Criar pagamento pendente virtual
-              const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), student.paymentDay!);
-              pendingPaymentsGenerated.push({
-                id: `pending-${student.id}-${currentMonth}`,
-                studentName: student.name,
-                studentId: student.id,
-                amount: student.monthlyFee!,
-                paymentDate: null,
-                dueDate: format(dueDate, 'yyyy-MM-dd'),
-                status: isPast(dueDate) && !isToday(dueDate) ? 'overdue' : 'pending',
-                referenceMonth: currentMonth,
-                teacherId: userData.id,
-              });
-            }
+        if (!existingPayment) {
+          // Criar pagamento pendente virtual
+          const dueDate = new Date(new Date().getFullYear(), new Date().getMonth(), student.paymentDay!);
+          pendingPaymentsGenerated.push({
+            id: `pending-${student.id}-${currentMonth}`,
+            studentName: student.name,
+            studentId: student.id,
+            amount: student.monthlyFee!,
+            paymentDate: null,
+            dueDate: format(dueDate, 'yyyy-MM-dd'),
+            status: isPast(dueDate) && !isToday(dueDate) ? 'overdue' : 'pending',
+            referenceMonth: currentMonth,
+            teacherId: teacherId || undefined,
           });
-        
-        setPayments([...teacherPayments, ...pendingPaymentsGenerated]);
-        setStudents(teacherStudents);
-      } else {
-        setPayments([]);
-        setStudents([]);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        }
+      });
+    
+    return [...paymentsData, ...pendingPaymentsGenerated];
+  }, [paymentsData, studentsData, teacherId]);
+
+  const students = useMemo(() => studentsData, [studentsData]);
+
+  const isLoading = loading || isLoadingPayments || isLoadingStudents;
 
   const handleSave = async (data: any) => {
     setIsSaving(true);
@@ -332,24 +326,24 @@ export default function FinancePage() {
         paymentDate: data.paymentDate || null,
         status: data.status,
         referenceMonth: data.referenceMonth || null,
-        teacherId: userData?.id || null,
+        teacherId: teacherId || null,
       };
 
-      if (editingPayment) {
-        await firestoreService.update(COLLECTIONS.PAYMENTS, editingPayment.id, paymentData);
+      if (editingPayment && !editingPayment.id.startsWith('pending-')) {
+        await updatePaymentMutation.mutateAsync({ 
+          id: editingPayment.id, 
+          data: paymentData 
+        });
         toast({ title: 'Pagamento atualizado!' });
       } else {
-        await firestoreService.create(COLLECTIONS.PAYMENTS, paymentData);
+        await createPaymentMutation.mutateAsync(paymentData);
         toast({ title: 'Pagamento registrado!' });
       }
 
-      // Invalidar cache para atualizar outras páginas
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-
       setShowForm(false);
       setEditingPayment(null);
-      fetchData();
     } catch (error) {
+      console.error('Error saving payment:', error);
       toast({ title: 'Erro ao salvar pagamento', variant: 'destructive' });
     } finally {
       setIsSaving(false);
@@ -360,17 +354,15 @@ export default function FinancePage() {
     // Verificar se é um pagamento virtual (pendente gerado automaticamente)
     if (id.startsWith('pending-')) {
       toast({ title: 'Pagamento pendente removido da lista!', description: 'O aluno não terá mensalidade gerada automaticamente.' });
-      fetchData();
       return;
     }
     
     if (!confirm('Deseja realmente excluir este pagamento?')) return;
     try {
-      await firestoreService.delete(COLLECTIONS.PAYMENTS, id);
+      await deletePaymentMutation.mutateAsync(id);
       toast({ title: 'Pagamento excluído!' });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      fetchData();
     } catch (error) {
+      console.error('Error deleting payment:', error);
       toast({ title: 'Erro ao excluir pagamento', variant: 'destructive' });
     }
   };
@@ -379,7 +371,7 @@ export default function FinancePage() {
     try {
       // Se for um pagamento virtual (pendente gerado automaticamente), criar no banco
       if (payment.id.startsWith('pending-')) {
-        await firestoreService.create(COLLECTIONS.PAYMENTS, {
+        await createPaymentMutation.mutateAsync({
           studentName: payment.studentName,
           studentId: payment.studentId,
           amount: payment.amount,
@@ -387,18 +379,20 @@ export default function FinancePage() {
           dueDate: payment.dueDate,
           status: 'paid',
           referenceMonth: payment.referenceMonth,
-          teacherId: userData?.id || null,
+          teacherId: teacherId || null,
         });
       } else {
-        await firestoreService.update(COLLECTIONS.PAYMENTS, payment.id, {
-          status: 'paid',
-          paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        await updatePaymentMutation.mutateAsync({ 
+          id: payment.id, 
+          data: {
+            status: 'paid',
+            paymentDate: format(new Date(), 'yyyy-MM-dd'),
+          }
         });
       }
       toast({ title: 'Pagamento confirmado!' });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      fetchData();
     } catch (error) {
+      console.error('Error confirming payment:', error);
       toast({ title: 'Erro ao confirmar pagamento', variant: 'destructive' });
     }
   };
@@ -471,17 +465,17 @@ export default function FinancePage() {
     return result;
   }, [payments, search, statusFilter, sortField, sortDirection]);
 
-  const monthlyIncome = payments
+  const monthlyIncome = useMemo(() => payments
     .filter((p) => p.status === 'paid' && p.paymentDate)
     .filter((p) => {
       const payDate = parseISO(p.paymentDate!);
       return payDate >= monthStart && payDate <= monthEnd;
     })
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+    .reduce((sum, p) => sum + (p.amount || 0), 0), [payments, monthStart, monthEnd]);
 
-  const pendingPayments = payments
+  const pendingPayments = useMemo(() => payments
     .filter((p) => p.status === 'pending' || p.status === 'overdue')
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+    .reduce((sum, p) => sum + (p.amount || 0), 0), [payments]);
 
   const statusColors: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
@@ -588,15 +582,27 @@ export default function FinancePage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              onClick={() => {
-                setEditingPayment(null);
-                setShowForm(true);
-              }}
-              className="bg-slate-800 hover:bg-slate-700"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Novo Pagamento
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  refetchPayments();
+                  refetchStudents();
+                }}
+                className={darkMode ? 'border-slate-700 text-slate-300' : ''}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingPayment(null);
+                  setShowForm(true);
+                }}
+                className="bg-slate-800 hover:bg-slate-700"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Novo Pagamento
+              </Button>
+            </div>
           </div>
 
           {/* Payments Table */}

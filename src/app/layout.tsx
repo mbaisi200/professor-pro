@@ -22,7 +22,9 @@ export const metadata: Metadata = {
   keywords: ["ProClass", "Professores", "Aulas", "Gestão", "Educação"],
   authors: [{ name: "ProClass Team" }],
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
   },
 };
 
