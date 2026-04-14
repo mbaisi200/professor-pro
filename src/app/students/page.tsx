@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock } from 'lucide-react';
+import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock, Target } from 'lucide-react';
 
 // Deep Purple theme color
 const DEEP_PURPLE = '#844FC1';
@@ -729,6 +729,70 @@ export default function StudentsPage() {
                       </span>
                     </div>
                   )}
+
+                  {/* Ciclo de Aulas */}
+                  {student.contractedLessons && student.contractedLessons > 0 && (() => {
+                    const completed = student.completedLessonsInCycle || 0;
+                    const contracted = student.contractedLessons;
+                    const remaining = Math.max(contracted - completed, 0);
+                    const progress = contracted > 0 ? (completed / contracted) * 100 : 0;
+                    const isNearEnd = remaining <= 2 && remaining > 0;
+                    const isComplete = remaining <= 0;
+                    const accentColor = isComplete ? 'emerald' : isNearEnd ? 'amber' : 'purple';
+                    return (
+                      <div className={`py-2.5 mt-1 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                        {/* Header do Ciclo */}
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Target className={`w-3.5 h-3.5 ${isComplete ? (darkMode ? 'text-emerald-400' : 'text-emerald-500') : isNearEnd ? (darkMode ? 'text-amber-400' : 'text-amber-500') : (darkMode ? 'text-purple-400' : 'text-purple-500')}`} />
+                          <span className={`text-xs font-semibold ${isComplete ? (darkMode ? 'text-emerald-300' : 'text-emerald-600') : isNearEnd ? (darkMode ? 'text-amber-300' : 'text-amber-600') : (darkMode ? 'text-purple-300' : 'text-purple-600')}`}>
+                            Ciclo de Aulas
+                          </span>
+                          {isComplete && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-auto ${darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                              COMPLETO
+                            </span>
+                          )}
+                        </div>
+                        {/* Detalhes do Ciclo */}
+                        <div className="grid grid-cols-3 gap-1 mb-2">
+                          <div className={`text-center py-1 px-0.5 rounded ${darkMode ? 'bg-slate-700/60' : 'bg-slate-50'}`}>
+                            <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Contratadas</p>
+                            <p className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{contracted}</p>
+                          </div>
+                          <div className={`text-center py-1 px-0.5 rounded ${darkMode ? 'bg-slate-700/60' : 'bg-slate-50'}`}>
+                            <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Realizadas</p>
+                            <p className={`text-sm font-bold ${isComplete ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : isNearEnd ? (darkMode ? 'text-amber-400' : 'text-amber-600') : (darkMode ? 'text-purple-400' : 'text-purple-600')}`}>{completed}</p>
+                          </div>
+                          <div className={`text-center py-1 px-0.5 rounded ${darkMode ? 'bg-slate-700/60' : 'bg-slate-50'}`}>
+                            <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Restantes</p>
+                            <p className={`text-sm font-bold ${isComplete ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : isNearEnd ? (darkMode ? 'text-amber-400' : 'text-amber-600') : (darkMode ? 'text-slate-300' : 'text-slate-600')}`}>{isComplete ? 0 : remaining}</p>
+                          </div>
+                        </div>
+                        {/* Barra de progresso com porcentagem */}
+                        <div className="flex items-center gap-2">
+                          <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isComplete
+                                  ? 'bg-emerald-500'
+                                  : isNearEnd
+                                    ? 'bg-amber-500'
+                                    : 'bg-purple-500'
+                              }`}
+                              style={{ width: `${Math.min(progress, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-semibold min-w-[32px] text-right ${
+                            isComplete ? (darkMode ? 'text-emerald-400' : 'text-emerald-600')
+                            : isNearEnd ? (darkMode ? 'text-amber-400' : 'text-amber-600')
+                            : (darkMode ? 'text-purple-400' : 'text-purple-600')
+                          }`}>
+                            {Math.min(progress, 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex gap-1.5 pt-1">
                     <Button

@@ -59,8 +59,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  RadialBarChart,
-  RadialBar,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -825,27 +823,6 @@ export default function BIPage() {
     return list;
   }, [overdueRevenue, studentsAtRisk, studentsNearEndOfCycle, newStudentsThisMonth, completionRate, collectionRate, expectedRevenue, completedLessonsThisMonth.length]);
 
-  // Performance metrics for radial chart
-  const performanceData = useMemo(() => {
-    return [
-      {
-        name: 'Cobrança',
-        value: Math.min(collectionRate, 100),
-        fill: CYAN,
-      },
-      {
-        name: 'Conclusão',
-        value: Math.min(completionRate, 100),
-        fill: PURPLE,
-      },
-      {
-        name: 'Retenção',
-        value: Math.min(retentionRate, 100),
-        fill: EMERALD,
-      },
-    ];
-  }, [collectionRate, completionRate, retentionRate]);
-
   if (authLoading || isLoading) {
     return <LoadingSkeleton darkMode={darkMode} />;
   }
@@ -1113,12 +1090,12 @@ export default function BIPage() {
               </ResponsiveContainer>
             </motion.div>
 
-            {/* Performance Radial */}
+            {/* Painel de Desempenho */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className={`rounded-2xl p-6 ${
+              className={`rounded-2xl p-5 overflow-y-auto max-h-[600px] ${
                 darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg'
               }`}
             >
@@ -1126,37 +1103,163 @@ export default function BIPage() {
                 darkMode ? 'text-white' : 'text-slate-800'
               }`}>
                 <Activity className="w-5 h-5" style={{ color: PURPLE }} />
-                Indicadores de Performance
+                Painel de Desempenho
               </h2>
 
-              <ResponsiveContainer width="100%" height={200}>
-                <RadialBarChart
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="30%"
-                  outerRadius="90%"
-                  data={performanceData}
-                  startAngle={180}
-                  endAngle={0}
-                >
-                  <RadialBar
-                    background
-                    dataKey="value"
-                    cornerRadius={10}
-                  />
-                  <Legend
-                    iconSize={10}
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    align="center"
-                    formatter={(value, entry: any) => (
-                      <span className={darkMode ? 'text-gray-300' : 'text-slate-600'} style={{ fontSize: 12 }}>
-                        {entry.name}: {Number(entry.value).toFixed(0)}%
-                      </span>
-                    )}
-                  />
-                </RadialBarChart>
-              </ResponsiveContainer>
+              <div className="space-y-3">
+                {/* Seção Financeiro */}
+                {(() => {
+                  const value = Math.min(collectionRate, 100);
+                  const label = value >= 90 ? 'Excelente' : value >= 70 ? 'Bom' : value >= 50 ? 'Atenção' : 'Crítico';
+                  const color = value >= 90 ? EMERALD : value >= 70 ? CYAN : value >= 50 ? AMBER : ROSE;
+                  return (
+                    <div className={`p-3 rounded-xl border-l-4 ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50/50'}`} style={{ borderLeftColor: color }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" style={{ color }} />
+                          <span className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>
+                            Financeiro
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            value >= 90 ? (darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700')
+                            : value >= 70 ? (darkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700')
+                            : value >= 50 ? (darkMode ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')
+                            : (darkMode ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-100 text-rose-700')
+                          }`}>{label}</span>
+                          <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            {value.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`w-full h-2 rounded-full overflow-hidden mb-1.5 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, backgroundColor: color }} />
+                      </div>
+                      <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                        Dos alunos com mensalidade, <strong>{value.toFixed(0)}%</strong> realizaram o pagamento este mês.
+                        {value >= 70 ? ' Saúde financeira positiva.' : ' Verifique pagamentos em atraso.'}
+                      </p>
+                      <div className={`mt-1.5 text-xs ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>
+                        Pendente: R$ {pendingRevenue.toFixed(0)}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Seção Aulas */}
+                {(() => {
+                  const value = Math.min(completionRate, 100);
+                  const label = value >= 90 ? 'Excelente' : value >= 70 ? 'Bom' : value >= 50 ? 'Atenção' : 'Crítico';
+                  const color = value >= 90 ? EMERALD : value >= 70 ? CYAN : value >= 50 ? AMBER : ROSE;
+                  return (
+                    <div className={`p-3 rounded-xl border-l-4 ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50/50'}`} style={{ borderLeftColor: color }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4" style={{ color }} />
+                          <span className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>
+                            Aulas
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            value >= 90 ? (darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700')
+                            : value >= 70 ? (darkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700')
+                            : value >= 50 ? (darkMode ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')
+                            : (darkMode ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-100 text-rose-700')
+                          }`}>{label}</span>
+                          <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            {value.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`w-full h-2 rounded-full overflow-hidden mb-1.5 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, backgroundColor: color }} />
+                      </div>
+                      <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                        Do total de aulas agendadas, <strong>{value.toFixed(0)}%</strong> foram concluídas sem cancelamento.
+                        {value >= 70 ? ' Comprometimento dos alunos é alto.' : ' Avalie causas de cancelamento.'}
+                      </p>
+                      <div className={`mt-1.5 text-xs ${darkMode ? 'text-rose-300' : 'text-rose-600'}`}>
+                        Canceladas: {cancelledLessonsThisMonth.length} este mês
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Seção Alunos */}
+                {(() => {
+                  const value = Math.min(retentionRate, 100);
+                  const label = value >= 90 ? 'Excelente' : value >= 70 ? 'Bom' : value >= 50 ? 'Atenção' : 'Crítico';
+                  const color = value >= 90 ? EMERALD : value >= 70 ? CYAN : value >= 50 ? AMBER : ROSE;
+                  return (
+                    <div className={`p-3 rounded-xl border-l-4 ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50/50'}`} style={{ borderLeftColor: color }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" style={{ color }} />
+                          <span className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>
+                            Alunos
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            value >= 90 ? (darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700')
+                            : value >= 70 ? (darkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-100 text-cyan-700')
+                            : value >= 50 ? (darkMode ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700')
+                            : (darkMode ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-100 text-rose-700')
+                          }`}>{label}</span>
+                          <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            {value.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`w-full h-2 rounded-full overflow-hidden mb-1.5 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, backgroundColor: color }} />
+                      </div>
+                      <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                        <strong>{value.toFixed(0)}%</strong> dos alunos com mais de 3 meses continuam ativos.
+                        {value >= 70 ? ' Boa fidelização de alunos.' : ' Foco em manter os alunos engajados.'}
+                      </p>
+                      <div className={`mt-1.5 text-xs ${darkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>
+                        Novos alunos: {newStudentsThisMonth.length} este mês
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Score Geral */}
+                {(() => {
+                  const overall = (Math.min(collectionRate, 100) + Math.min(completionRate, 100) + Math.min(retentionRate, 100)) / 3;
+                  const grade = overall >= 90 ? 'A+' : overall >= 80 ? 'A' : overall >= 70 ? 'B+' : overall >= 60 ? 'B' : overall >= 50 ? 'C' : 'D';
+                  const gradeColor = overall >= 70 ? EMERALD : overall >= 50 ? AMBER : ROSE;
+                  const gradeDesc = overall >= 90 ? 'Desempenho excepcional! Continue assim.' : overall >= 70 ? 'Bom desempenho geral. Oportunidades de melhoria nas áreas sinalizadas.' : overall >= 50 ? 'Desempenho moderado. Ação recomendada nos indicadores em atenção.' : 'Desempenho abaixo do esperado. Ação urgente necessária.';
+                  return (
+                    <div className={`p-4 rounded-xl border ${
+                      darkMode ? 'bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border-purple-500/20' : 'bg-gradient-to-r from-purple-50 to-cyan-50 border-purple-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <p className={`text-sm font-semibold ${darkMode ? 'text-gray-200' : 'text-slate-700'}`}>
+                            Score Geral
+                          </p>
+                          <p className={`text-[11px] ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                            Média das taxas de cobrança, conclusão e retenção
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-2xl font-bold`} style={{ color: gradeColor }}>{grade}</span>
+                          <span className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            {overall.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <p className={`text-[11px] mt-1 ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                        {gradeDesc}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
             </motion.div>
           </div>
 

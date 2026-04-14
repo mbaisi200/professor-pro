@@ -33,7 +33,9 @@ import {
   Key,
   Eye,
   EyeOff,
-  Database
+  Database,
+  Download,
+  Archive
 } from 'lucide-react';
 import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth, subMonths, addDays, getDay, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1099,7 +1101,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'teachers' | 'payments' | 'import' | 'populate'>('teachers');
+  const [activeTab, setActiveTab] = useState<'teachers' | 'payments' | 'import' | 'populate' | 'backup'>('teachers');
   const [importJson, setImportJson] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<any>(null);
@@ -1122,6 +1124,15 @@ export default function AdminPage() {
   const [isPopulating, setIsPopulating] = useState<boolean>(false);
   const [populateProgress, setPopulateProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [populateResults, setPopulateResults] = useState<any>(null);
+  // Backup states
+  const [backupFilter, setBackupFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [backupTeacherId, setBackupTeacherId] = useState<string>('');
+  const [backupMode, setBackupMode] = useState<'all' | 'teacher' | 'students'>('all');
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupResult, setBackupResult] = useState<any>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [allStudentsForBackup, setAllStudentsForBackup] = useState<any[]>([]);
+  const [backupStudentSearch, setBackupStudentSearch] = useState('');
   const { toast } = useToast();
 
   const { user, userData, loading } = useAuth();
@@ -1507,6 +1518,123 @@ export default function AdminPage() {
       });
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    setBackupResult(null);
+    try {
+      // Fetch all data from all collections
+      const [studentsData, lessonsData, paymentsData, usersData] = await Promise.all([
+        getDocs(collection(db, 'students')),
+        getDocs(collection(db, 'lessons')),
+        getDocs(collection(db, 'payments')),
+        getDocs(collection(db, 'users')),
+      ]);
+
+      let allStudents = studentsData.docs.map(d => ({ id: d.id, ...d.data() }));
+      let allLessons = lessonsData.docs.map(d => ({ id: d.id, ...d.data() }));
+      let allPayments = paymentsData.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allUsers = usersData.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter by teacher if specific teacher selected
+      if (backupMode === 'teacher' && backupTeacherId) {
+        allStudents = allStudents.filter((s: any) => s.teacherId === backupTeacherId);
+        allLessons = allLessons.filter((l: any) => l.teacherId === backupTeacherId);
+        allPayments = allPayments.filter((p: any) => p.teacherId === backupTeacherId);
+      }
+
+      // Filter by specific students selected
+      if (backupMode === 'students' && selectedStudentIds.length > 0) {
+        const selectedSet = new Set(selectedStudentIds);
+        allStudents = allStudents.filter((s: any) => selectedSet.has(s.id));
+        allLessons = allLessons.filter((l: any) => l.studentId && selectedSet.has(l.studentId));
+        allPayments = allPayments.filter((p: any) => p.studentId && selectedSet.has(p.studentId));
+      }
+
+      // Filter by status (active/inactive)
+      if (backupFilter !== 'all') {
+        allStudents = allStudents.filter((s: any) => s.status === backupFilter);
+        // Also filter lessons and payments to only include those from filtered students
+        const filteredStudentIds = new Set(allStudents.map((s: any) => s.id));
+        allLessons = allLessons.filter((l: any) => !l.studentId || filteredStudentIds.has(l.studentId));
+        allPayments = allPayments.filter((p: any) => !p.studentId || filteredStudentIds.has(p.studentId));
+      }
+
+      // Clean data for backup (remove undefined values and convert timestamps)
+      const cleanData = (data: any[]) => data.map(item => {
+        const cleaned: Record<string, any> = {};
+        Object.entries(item).forEach(([key, value]) => {
+          if (value === undefined) return;
+          // Convert Firestore timestamps to ISO strings
+          if (value && typeof value === 'object' && value.toDate && typeof value.toDate === 'function') {
+            cleaned[key] = value.toDate().toISOString();
+          } else {
+            cleaned[key] = value;
+          }
+        });
+        return cleaned;
+      });
+
+      const backupData = {
+        _metadata: {
+          version: '1.0',
+          exportDate: new Date().toISOString(),
+          system: 'professor-pro',
+          filter: backupFilter,
+          backupMode: backupMode,
+          teacherId: backupMode === 'teacher' ? backupTeacherId : null,
+          selectedStudentIds: backupMode === 'students' ? selectedStudentIds : null,
+          counts: {
+            students: allStudents.length,
+            lessons: allLessons.length,
+            payments: allPayments.length,
+            users: allUsers.length,
+          },
+        },
+        students: cleanData(allStudents),
+        lessons: cleanData(allLessons),
+        payments: cleanData(allPayments),
+        users: cleanData(allUsers),
+      };
+
+      // Create and download JSON file
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = format(new Date(), 'yyyy-MM-dd_HHmmss');
+      const filterStr = backupFilter !== 'all' ? `_${backupFilter}` : '';
+      const teacherStr = backupMode === 'teacher' ? '_professor' : backupMode === 'students' ? `_alunos-selecionados` : '_todos';
+      link.download = `backup_professor-pro${filterStr}${teacherStr}_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setBackupResult({
+        students: allStudents.length,
+        lessons: allLessons.length,
+        payments: allPayments.length,
+        users: allUsers.length,
+        fileName: link.download,
+      });
+
+      toast({
+        title: 'Backup realizado com sucesso!',
+        description: `${allStudents.length} alunos, ${allLessons.length} aulas e ${allPayments.length} pagamentos exportados.`,
+      });
+    } catch (error: any) {
+      console.error('Backup error:', error);
+      toast({
+        title: 'Erro no backup',
+        description: error.message || 'Erro desconhecido ao gerar backup',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBackingUp(false);
     }
   };
 
@@ -2136,6 +2264,21 @@ export default function AdminPage() {
     return matchesSearch && matchesRole;
   });
 
+  // Helper to filter students for backup selection
+  const getFilteredBackupStudents = () => {
+    let filtered = allStudentsForBackup;
+    if (backupStudentSearch) {
+      filtered = filtered.filter((s: any) =>
+        (s.name || '').toLowerCase().includes(backupStudentSearch.toLowerCase()) ||
+        (s.subject || '').toLowerCase().includes(backupStudentSearch.toLowerCase())
+      );
+    }
+    if (backupFilter !== 'all') {
+      filtered = filtered.filter((s: any) => s.status === backupFilter);
+    }
+    return filtered.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+  };
+
   const totalTeachers = teachers.filter(t => t.role === 'teacher').length;
   const totalAdmins = teachers.filter(t => t.role === 'admin').length;
   const activeTeachers = teachers.filter(t => t.status === 'active' && !checkExpired(t)).length;
@@ -2265,6 +2408,14 @@ export default function AdminPage() {
               darkMode={darkMode}
             >
               Popular Dados
+            </TabButton>
+            <TabButton
+              active={activeTab === 'backup'}
+              onClick={() => setActiveTab('backup')}
+              icon={Archive}
+              darkMode={darkMode}
+            >
+              Backup
             </TabButton>
           </div>
 
@@ -2556,6 +2707,340 @@ export default function AdminPage() {
                   </div>
                 </div>
               </motion.div>
+            </motion.div>
+          )}
+
+          {/* Backup Tab */}
+          {activeTab === 'backup' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`p-3 rounded-xl ${darkMode ? 'bg-cyan-900/30' : 'bg-cyan-100'}`}>
+                  <Archive className={`w-6 h-6 ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`} />
+                </div>
+                <div>
+                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Backup de Dados
+                  </h2>
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Exporte os dados do sistema em formato JSON para backup ou restauração futura
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* Seleção de Escopo */}
+                <div>
+                  <h3 className={`text-sm font-medium mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Escopo do Backup
+                  </h3>
+                  <div className={`p-4 rounded-xl space-y-3 ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupMode"
+                        value="all"
+                        checked={backupMode === 'all'}
+                        onChange={() => setBackupMode('all')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          Todos os Professores
+                        </span>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Backup completo de todos os dados do sistema
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupMode"
+                        value="teacher"
+                        checked={backupMode === 'teacher'}
+                        onChange={() => { setBackupMode('teacher'); setSelectedStudentIds([]); }}
+                        className="w-4 h-4 text-blue-600 mt-1"
+                      />
+                      <div className="flex-1">
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          De um Professor Específico
+                        </span>
+                        <p className={`text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Backup apenas dos dados vinculados a um professor
+                        </p>
+                        {backupMode === 'teacher' && (
+                          <select
+                            value={backupTeacherId}
+                            onChange={(e) => setBackupTeacherId(e.target.value)}
+                            className={`w-full mt-2 px-3 py-2 rounded-lg border text-sm ${
+                              darkMode
+                                ? 'bg-slate-600 border-slate-500 text-white'
+                                : 'bg-white border-slate-200'
+                            }`}
+                          >
+                            <option value="">Selecione um professor...</option>
+                            {teachers
+                              .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                              .map((teacher) => (
+                                <option key={teacher.id} value={teacher.id}>
+                                  {teacher.name} ({teacher.role === 'admin' ? 'Admin' : 'Professor'})
+                                </option>
+                              ))}
+                          </select>
+                        )}
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupMode"
+                        value="students"
+                        checked={backupMode === 'students'}
+                        onChange={() => setBackupMode('students')}
+                        className="w-4 h-4 text-blue-600 mt-1"
+                      />
+                      <div className="flex-1">
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          Alunos Selecionados
+                        </span>
+                        <p className={`text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Escolha alunos específicos para incluir no backup
+                        </p>
+                        {backupMode === 'students' && (
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Input
+                                placeholder="Buscar aluno por nome..."
+                                value={backupStudentSearch}
+                                onChange={(e) => setBackupStudentSearch(e.target.value)}
+                                className={`text-sm ${darkMode ? 'bg-slate-600 border-slate-500 text-white' : 'bg-white border-slate-200'}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={async () => {
+                                  const snapshot = await getDocs(collection(db, 'students'));
+                                  const studentsData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                                  setAllStudentsForBackup(studentsData);
+                                }}
+                                className={`whitespace-nowrap text-xs ${darkMode ? 'border-slate-500 text-white' : ''}`}
+                              >
+                                Carregar
+                              </Button>
+                            </div>
+                            {allStudentsForBackup.length > 0 ? (
+                              <>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const filteredIds = getFilteredBackupStudents().map((s: any) => s.id);
+                                      setSelectedStudentIds(filteredIds);
+                                    }}
+                                    className="text-xs h-6 px-2"
+                                  >
+                                    Selecionar todos
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setSelectedStudentIds([])}
+                                    className="text-xs h-6 px-2"
+                                  >
+                                    Limpar seleção
+                                  </Button>
+                                  <span className={`text-xs ml-auto ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {selectedStudentIds.length} selecionado(s)
+                                  </span>
+                                </div>
+                                <div className={`max-h-48 overflow-y-auto rounded-lg border p-2 space-y-1 ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                                  {getFilteredBackupStudents().map((student: any) => (
+                                    <label key={student.id} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer hover:${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedStudentIds.includes(student.id)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedStudentIds([...selectedStudentIds, student.id]);
+                                          } else {
+                                            setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 rounded"
+                                      />
+                                      <span className={`text-sm flex-1 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                                        {student.name || 'Sem nome'}
+                                      </span>
+                                      {student.subject && (
+                                        <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          {student.subject}
+                                        </span>
+                                      )}
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                        student.status === 'active' ? (darkMode ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700')
+                                        : student.status === 'inactive' ? (darkMode ? 'bg-slate-500/20 text-slate-300' : 'bg-slate-100 text-slate-600')
+                                        : (darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700')
+                                      }`}>
+                                        {student.status === 'active' ? 'Ativo' : student.status === 'inactive' ? 'Inativo' : 'Teste'}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <p className={`text-xs text-center py-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                Clique em &quot;Carregar&quot; para buscar a lista de alunos
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Filtro de Status */}
+                <div>
+                  <h3 className={`text-sm font-medium mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Filtro de Alunos
+                  </h3>
+                  <div className={`p-4 rounded-xl space-y-3 ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupFilter"
+                        value="all"
+                        checked={backupFilter === 'all'}
+                        onChange={() => setBackupFilter('all')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          Todos os Alunos
+                        </span>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Inclui ativos, inativos e em teste
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupFilter"
+                        value="active"
+                        checked={backupFilter === 'active'}
+                        onChange={() => setBackupFilter('active')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          Apenas Alunos Ativos
+                        </span>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Inclui somente alunos com status ativo e suas aulas/pagamentos
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="backupFilter"
+                        value="inactive"
+                        checked={backupFilter === 'inactive'}
+                        onChange={() => setBackupFilter('inactive')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                          Apenas Alunos Inativos
+                        </span>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Inclui somente alunos inativos e suas aulas/pagamentos
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Info sobre o formato */}
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-blue-900/20 border-blue-800/50' : 'bg-blue-50 border-blue-200'}`}>
+                  <div className="flex items-start gap-3">
+                    <FileJson className={`w-5 h-5 mt-0.5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                    <div>
+                      <p className={`font-medium text-sm ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                        Formato compatível com o sistema
+                      </p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                        O backup é exportado em JSON com a estrutura completa dos dados (alunos, aulas, pagamentos e usuários). 
+                        Este formato é compatível com a função de importação do sistema, permitindo restauração futura caso necessário. 
+                        O arquivo inclui metadados como data, versão e filtros utilizados.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resultado do backup */}
+                {backupResult && (
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className={`w-5 h-5 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                      <p className={`font-medium text-sm ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                        Backup gerado com sucesso!
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-slate-800/50' : 'bg-white'}`}>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{backupResult.students}</p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alunos</p>
+                      </div>
+                      <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-slate-800/50' : 'bg-white'}`}>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{backupResult.lessons}</p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aulas</p>
+                      </div>
+                      <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-slate-800/50' : 'bg-white'}`}>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{backupResult.payments}</p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pagamentos</p>
+                      </div>
+                      <div className={`p-2 rounded-lg text-center ${darkMode ? 'bg-slate-800/50' : 'bg-white'}`}>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{backupResult.users}</p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Usuários</p>
+                      </div>
+                    </div>
+                    <p className={`text-xs mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Arquivo: {backupResult.fileName}
+                    </p>
+                  </div>
+                )}
+
+                {/* Botão de backup */}
+                <Button
+                  onClick={handleBackup}
+                  disabled={isBackingUp || (backupMode === 'teacher' && !backupTeacherId) || (backupMode === 'students' && selectedStudentIds.length === 0)}
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                >
+                  {isBackingUp ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando Backup...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" /> Gerar Backup JSON
+                    </>
+                  )}
+                </Button>
+              </div>
             </motion.div>
           )}
 
