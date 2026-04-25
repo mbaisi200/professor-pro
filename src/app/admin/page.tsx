@@ -2298,10 +2298,11 @@ export default function AdminPage() {
     .filter((p) => p.status === 'pending' || p.status === 'overdue')
     .reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const filteredPayments = payments.filter((p) => {
-    const matchesSearch = p.teacherName?.toLowerCase().includes(search.toLowerCase()) ?? false;
-    return matchesSearch;
-  });
+  // Professores com mensalidade para lista e busca
+  const teachersWithFee = teachers.filter(t => t.role === 'teacher' && !t.isExempt && t.mensalidade);
+  const filteredPayments = teachersWithFee.filter(t => 
+    search === '' || (t.name?.toLowerCase().includes(search.toLowerCase()) ?? false)
+  );
 
   const statusColors: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',

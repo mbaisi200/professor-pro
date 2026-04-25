@@ -115,10 +115,8 @@ function LessonForm({
     subject: lesson?.subject || '',
     contentCovered: lesson?.contentCovered || '',
     status: lesson?.status || 'scheduled',
+    isCycleEnd: lesson?.endOfCycle || false,
   });
-
-  // Data mínima para agendamento (hoje)
-  const minDate = format(new Date(), 'yyyy-MM-dd');
 
   const handleStudentChange = (studentId: string) => {
     const student = students.find((s) => s.id === studentId);
@@ -133,12 +131,8 @@ function LessonForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar se a data é anterior à data atual (apenas para novas aulas)
-    const selectedDate = parseISO(form.date);
-    const today = startOfDay(new Date());
-    
-    if (!lesson && isBefore(selectedDate, today)) {
-      alert('Não é possível agendar aulas com datas anteriores à atual.');
+    if (form.status === 'cycle_end' && !form.studentId) {
+      alert('Para lançar o Final do Ciclo, selecione um aluno.');
       return;
     }
     
@@ -157,7 +151,7 @@ function LessonForm({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className={`rounded-2xl w-full max-w-md ${
+        className={`rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${
           darkMode ? 'bg-slate-800' : 'bg-white'
         } shadow-2xl`}
       >
@@ -184,7 +178,6 @@ function LessonForm({
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                min={lesson ? undefined : minDate}
                 required
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
@@ -249,7 +242,7 @@ function LessonForm({
             </label>
             <select
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
+              onChange={(e) => setForm({ ...form, status: e.target.value, isCycleEnd: e.target.value === 'cycle_end' })}
               className={`w-full mt-1 px-3 py-2 rounded-lg border ${
                 darkMode
                   ? 'bg-slate-700 border-slate-600 text-white'
@@ -260,7 +253,13 @@ function LessonForm({
               <option value="completed">Concluída</option>
               <option value="cancelled">Cancelada</option>
               <option value="rescheduled">Remarcada</option>
+              <option value="cycle_end" disabled={!form.studentId}>🎯 Final do Ciclo</option>
             </select>
+            {form.status === 'cycle_end' && form.studentId && (
+              <p className="text-xs text-amber-600 mt-1">
+                ⚠️ Isto criará um marcador de Final do Ciclo para o aluno selecionado
+              </p>
+            )}
           </div>
 
           <div>
@@ -500,15 +499,22 @@ export default function LessonsPage() {
   const handleSave = async (data: any) => {
     setIsSaving(true);
     try {
+      const isManualCycleEnd = data.status === 'cycle_end';
+      
+      let contentCovered = data.contentCovered ? data.contentCovered.toUpperCase() : null;
+      if (isManualCycleEnd && !contentCovered) {
+        contentCovered = '🎯 FINAL DO CICLO - LANÇAMENTO MANUAL';
+      }
+      
       const lessonData = {
         date: data.date,
         startTime: data.startTime || null,
         studentId: data.studentId || null,
         studentName: data.studentName ? data.studentName.toUpperCase() : null,
         subject: data.subject ? data.subject.toUpperCase() : null,
-        contentCovered: data.contentCovered ? data.contentCovered.toUpperCase() : null,
-        status: data.status,
-        endOfCycle: false,
+        contentCovered,
+        status: isManualCycleEnd ? 'cycle_end' : data.status,
+        endOfCycle: isManualCycleEnd,
         teacherId: userData?.id || null,
       };
 
@@ -536,7 +542,22 @@ export default function LessonsPage() {
       } else {
         await firestoreService.create(COLLECTIONS.LESSONS, lessonData);
 
-        if (data.studentId && data.status === 'completed') {
+        if (isManualCycleEnd && data.studentId) {
+          const student = students.find(s => s.id === data.studentId);
+          const contractedLessons = student?.contractedLessons || 0;
+          
+          await firestoreService.update(COLLECTIONS.STUDENTS, data.studentId, {
+            endOfCycle: true,
+            completedLessonsInCycle: 0,
+          });
+          
+          toast({
+            title: '🎯 Final do Ciclo Registrado!',
+            description: contractedLessons > 0 
+              ? `Ciclo fechado manualmente em ${data.date}. Novo ciclo counting from this date.`
+              : 'Ciclo fechado manualmente. Configure as aulas contratadas do aluno.'
+          });
+        } else if (data.studentId && data.status === 'completed') {
           const cycleResult = await checkAndManageLessonCycle(
             data.studentId,
             data.status,
@@ -555,7 +576,6 @@ export default function LessonsPage() {
         toast({ title: `Aula ${statusLabels[data.status] || 'salva'}!` });
       }
 
-      // Invalidar cache para atualizar outras páginas
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
       
       setShowForm(false);
