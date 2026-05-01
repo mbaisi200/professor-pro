@@ -46,7 +46,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { firestoreService, COLLECTIONS } from '@/lib/firestore-helpers';
-import { checkAndManageLessonCycle } from '@/lib/firestore';
+import { checkAndManageLessonCycle, recalculateAllCycles } from '@/lib/firestore';
 
 interface Lesson {
   id: string;
@@ -522,13 +522,32 @@ export default function LessonsPage() {
         const previousStatus = editingLesson.status;
         await firestoreService.update(COLLECTIONS.LESSONS, editingLesson.id, lessonData);
 
-        if (data.studentId && data.status !== previousStatus) {
+        if (isManualCycleEnd && data.studentId) {
+          const student = students.find(s => s.id === data.studentId);
+          const contractedLessons = student?.contractedLessons || 0;
+          
+          await firestoreService.update(COLLECTIONS.STUDENTS, data.studentId, {
+            endOfCycle: true,
+            completedLessonsInCycle: 0,
+          });
+          
+          if (userData?.id) {
+            await recalculateAllCycles(data.studentId, userData.id);
+          }
+          
+          toast({
+            title: '🎯 Final do Ciclo Registrado!',
+            description: 'Ciclo fechado manualmente. Contador atualizado para o novo ciclo.'
+          });
+        } else if (data.studentId && data.status !== previousStatus) {
           const cycleResult = await checkAndManageLessonCycle(
             data.studentId,
             data.status,
             previousStatus,
             userData?.id || ''
           );
+
+          await recalculateAllCycles(data.studentId, userData?.id || '');
 
           if (cycleResult.markerCreated) {
             toast({
@@ -551,10 +570,14 @@ export default function LessonsPage() {
             completedLessonsInCycle: 0,
           });
           
+          if (userData?.id) {
+            await recalculateAllCycles(data.studentId, userData.id);
+          }
+          
           toast({
             title: '🎯 Final do Ciclo Registrado!',
             description: contractedLessons > 0 
-              ? `Ciclo fechado manualmente em ${data.date}. Novo ciclo counting from this date.`
+              ? `Ciclo fechado manualmente em ${data.date}. Novo ciclo a partir desta data.`
               : 'Ciclo fechado manualmente. Configure as aulas contratadas do aluno.'
           });
         } else if (data.studentId && data.status === 'completed') {
@@ -564,6 +587,8 @@ export default function LessonsPage() {
             null,
             userData?.id || ''
           );
+
+          await recalculateAllCycles(data.studentId, userData?.id || '');
 
           if (cycleResult.markerCreated) {
             toast({
@@ -594,6 +619,11 @@ export default function LessonsPage() {
     
     try {
       await firestoreService.delete(COLLECTIONS.LESSONS, lesson.id);
+      
+      if (lesson.studentId && userData?.id) {
+        await recalculateAllCycles(lesson.studentId, userData.id);
+      }
+      
       toast({ title: 'Aula excluída!' });
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
       setShowDetail(false);
@@ -616,6 +646,8 @@ export default function LessonsPage() {
           previousStatus,
           userData?.id || ''
         );
+
+        await recalculateAllCycles(lesson.studentId, userData?.id || '');
 
         if (cycleResult.markerCreated) {
           toast({

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock, Target } from 'lucide-react';
+import { Plus, Search, Users, Filter, Edit, Trash2, Phone, Mail, BookOpen, CalendarCheck, Flag, CalendarDays, Clock, Target, RefreshCw } from 'lucide-react';
 
 // Deep Purple theme color
 const DEEP_PURPLE = '#844FC1';
@@ -22,6 +22,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { firestoreService, COLLECTIONS } from '@/lib/firestore-helpers';
+import { recalculateAllCycles, refreshAllCyclesForTeacher } from '@/lib/firestore';
 
 // Função para calcular o tempo de estudo
 function calculateStudyTime(startDate: string | null): string {
@@ -438,6 +439,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [isSaving, setIsSaving] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -470,9 +472,39 @@ export default function StudentsPage() {
     }
   };
 
+  const handleRecalculateCycles = async () => {
+    if (!userData?.id) return;
+    setIsRecalculating(true);
+    try {
+      await refreshAllCyclesForTeacher(userData.id);
+      toast({
+        title: 'Ciclos recalculados!',
+        description: 'Todos os ciclos foram recalculados com base nas aulas registradas.'
+      });
+      await fetchStudents();
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao recalcular ciclos',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   const handleSave = async (data: any) => {
     setIsSaving(true);
     try {
+      const wasEndOfCycle = editingStudent?.endOfCycle || false;
+      const isNewEndOfCycle = data.endOfCycle || false;
+      
+      let completedLessonsValue = editingStudent?.completedLessonsInCycle || 0;
+      
+      if (isNewEndOfCycle && !wasEndOfCycle) {
+        completedLessonsValue = 0;
+      }
+      
       const studentData = {
         name: data.name ? data.name.toUpperCase() : null,
         email: data.email ? data.email.toLowerCase() : null,
@@ -486,17 +518,24 @@ export default function StudentsPage() {
         chargeFee: data.chargeFee,
         status: data.status,
         contractedLessons: data.contractedLessons ? parseInt(data.contractedLessons) : null,
-        completedLessonsInCycle: editingStudent?.completedLessonsInCycle || 0,
+        completedLessonsInCycle: completedLessonsValue,
         endOfCycle: data.endOfCycle || false,
         startDate: data.startDate || null,
         notes: data.notes ? data.notes.toUpperCase() : null,
-        // teacherId é sempre o userData.id (cada usuário vê apenas seus dados)
         teacherId: userData?.id || null,
       };
 
       if (editingStudent) {
         await firestoreService.update(COLLECTIONS.STUDENTS, editingStudent.id, studentData);
-        toast({ title: 'Aluno atualizado!' });
+        
+        if (data.contractedLessons && parseInt(data.contractedLessons) > 0 && userData?.id) {
+          await recalculateAllCycles(editingStudent.id, userData.id);
+        }
+        
+        toast({ 
+          title: 'Aluno atualizado!',
+          description: isNewEndOfCycle && !wasEndOfCycle ? 'Ciclo finalizado! Contador resetado para o novo ciclo.' : undefined
+        });
       } else {
         await firestoreService.create(COLLECTIONS.STUDENTS, studentData);
         toast({ title: 'Aluno cadastrado!' });
@@ -588,16 +627,26 @@ export default function StudentsPage() {
                 {students.length} alunos cadastrados
               </p>
             </div>
-            <Button
-              onClick={() => {
-                setEditingStudent(null);
-                setShowForm(true);
-              }}
-              className="hover:opacity-90"
-              style={{ backgroundColor: DEEP_PURPLE }}
-            >
-              <Plus className="w-4 h-4 mr-2" /> Novo Aluno
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRecalculateCycles}
+                disabled={isRecalculating}
+                className={darkMode ? 'border-slate-600 text-white' : ''}
+              >
+                <CalendarCheck className="w-4 h-4 mr-2" /> {isRecalculating ? 'Recalculando...' : 'Recalcular Ciclos'}
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingStudent(null);
+                  setShowForm(true);
+                }}
+                className="hover:opacity-90"
+                style={{ backgroundColor: DEEP_PURPLE }}
+              >
+                <Plus className="w-4 h-4 mr-2" /> Novo Aluno
+              </Button>
+            </div>
           </motion.div>
 
           {/* Filters */}
