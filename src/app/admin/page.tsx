@@ -93,6 +93,11 @@ interface TeacherPayment {
 // Phone mask for Brazilian format
 function formatPhone(value: string): string {
   if (!value) return '';
+
+  // Se começar com +, é número internacional - mantém como está
+  if (value.startsWith('+')) {
+    return value;
+  }
   
   // Remove tudo que não é número
   const numbers = value.replace(/\D/g, '');
@@ -115,6 +120,7 @@ function formatPhone(value: string): string {
 // Check if phone is Brazilian (has 10 or 11 digits)
 function isBrazilianPhone(phone: string): boolean {
   if (!phone) return true;
+  if (phone.startsWith('+')) return false;
   const numbers = phone.replace(/\D/g, '');
   return numbers.length <= 11;
 }

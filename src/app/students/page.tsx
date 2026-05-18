@@ -130,6 +130,10 @@ function StudentForm({
 
   // Função para aplicar máscara de telefone brasileiro
   const formatPhone = (value: string) => {
+    // Se começar com +, é número internacional - mantém como está
+    if (value.startsWith('+')) {
+      return value;
+    }
     // Remove tudo que não é número
     const numbers = value.replace(/\D/g, '');
     
@@ -217,7 +221,7 @@ function StudentForm({
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
                 placeholder="(00) 00000-0000"
-                maxLength={16}
+                maxLength={25}
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
@@ -243,7 +247,7 @@ function StudentForm({
                 value={form.guardianPhone}
                 onChange={(e) => setForm({ ...form, guardianPhone: formatPhone(e.target.value) })}
                 placeholder="(00) 00000-0000"
-                maxLength={16}
+                maxLength={25}
                 className={`mt-1 ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
               />
             </div>
