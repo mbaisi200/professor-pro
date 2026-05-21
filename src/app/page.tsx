@@ -43,7 +43,7 @@ function ExpirationModal({ darkMode }: { darkMode: boolean }) {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className={`rounded-3xl w-full max-w-md p-8 text-center relative overflow-hidden ${
-          darkMode ? 'glass-dark' : 'glass-light'
+          darkMode ? 'bg-slate-800 border-slate-700' : 'glass-light'
         }`}
       >
         {/* Glow Effect */}
@@ -143,7 +143,7 @@ function StatsCard({
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       className={`relative rounded-2xl p-5 overflow-hidden ${
         darkMode 
-          ? 'glass-dark' 
+          ? 'bg-slate-800 border-slate-700' 
           : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
       }`}
     >
@@ -182,7 +182,7 @@ function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
         {/* Stats Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className={`rounded-2xl p-5 ${darkMode ? 'glass-dark' : 'bg-white border border-slate-100'} animate-pulse`}>
+            <div key={i} className={`rounded-2xl p-5 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border border-slate-100'} animate-pulse`}>
               <div className={`h-4 w-24 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
               <div className={`h-8 w-16 mt-3 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
             </div>
@@ -192,7 +192,7 @@ function LoadingSkeleton({ darkMode }: { darkMode: boolean }) {
         {/* Content Skeleton */}
         <div className="grid lg:grid-cols-2 gap-6">
           {[...Array(2)].map((_, i) => (
-            <div key={i} className={`rounded-2xl p-6 ${darkMode ? 'glass-dark' : 'bg-white border border-slate-100'} animate-pulse`}>
+            <div key={i} className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border border-slate-100'} animate-pulse`}>
               <div className={`h-6 w-32 rounded ${darkMode ? 'bg-white/10' : 'bg-slate-200'}`}></div>
               <div className="mt-4 space-y-3">
                 {[...Array(3)].map((_, j) => (
@@ -271,19 +271,6 @@ export default function Dashboard() {
 
   const activeStudents = students.filter((s) => s.status === 'active').length;
 
-  const expectedMonthlyRevenue = students
-    .filter((s) => s.status === 'active' && s.monthlyFee)
-    .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
-
-  const upcomingLessons = lessons.filter((l) => {
-    const lessonDate = new Date(l.date);
-    return (
-      l.status === 'scheduled' &&
-      isAfter(lessonDate, addDays(today, -1)) &&
-      isBefore(lessonDate, addDays(today, 7))
-    );
-  });
-
   const monthlyIncome = payments
     .filter((p) => p.status === 'paid')
     .filter((p) => p.referenceMonth === selectedMonth)
@@ -314,6 +301,29 @@ export default function Dashboard() {
     });
 
   const pendingAmount = paymentAlerts.reduce((sum, a) => sum + a.amount, 0);
+
+  const pendingForSelectedMonth = students
+    .filter(s => s.status === 'active' && s.chargeFee !== false && s.monthlyFee)
+    .filter(student => {
+      const hasPaymentThisMonth = payments.some(
+        p => p.studentId === student.id && 
+             p.referenceMonth === selectedMonth && 
+             (p.status === 'paid' || p.status === 'pending')
+      );
+      return !hasPaymentThisMonth;
+    })
+    .reduce((sum, student) => sum + (student.monthlyFee || 0), 0);
+
+  const expectedMonthlyRevenue = monthlyIncome + pendingForSelectedMonth;
+
+  const upcomingLessons = lessons.filter((l) => {
+    const lessonDate = new Date(l.date);
+    return (
+      l.status === 'scheduled' &&
+      isAfter(lessonDate, addDays(today, -1)) &&
+      isBefore(lessonDate, addDays(today, 7))
+    );
+  });
 
   // Aulas concluídas - IGNORA marcadores de final de ciclo
   // REGRA: Aulas com endOfCycle=true são apenas marcadores, não aulas reais
@@ -438,7 +448,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
               className={`rounded-2xl p-6 ${
-                darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
+                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
               }`}
             >
               <div className="flex items-center justify-between mb-6">
@@ -516,7 +526,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className={`rounded-2xl p-6 ${
-                darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
+                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border border-slate-100 shadow-lg shadow-slate-200/50'
               }`}
             >
               <div className="flex items-center justify-between mb-6">

@@ -37,6 +37,7 @@ import {
   Download,
   Archive
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { format, addMonths, isBefore, parseISO, startOfMonth, endOfMonth, subMonths, addDays, getDay, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -1095,7 +1096,8 @@ function TabButton({
 }
 
 export default function AdminPage() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [payments, setPayments] = useState<TeacherPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1147,11 +1149,6 @@ export default function AdminPage() {
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved) setDarkMode(JSON.parse(saved));
-  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
