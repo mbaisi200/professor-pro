@@ -1,141 +1,108 @@
-# 🚀 Welcome to Z.ai Code Scaffold
+# 🎓 ProClass - Sistema de Gestão de Aulas
 
-A modern, production-ready web application scaffold powered by cutting-edge technologies, designed to accelerate your development with [Z.ai](https://chat.z.ai)'s AI-powered coding assistance.
+Sistema completo para professores particulares gerenciarem alunos, aulas, finanças e desempenho. Construído com **Next.js 16**, **Firebase** e **Tailwind CSS 4**.
 
-## ✨ Technology Stack
+## ✨ Funcionalidades
 
-This scaffold provides a robust foundation built with:
+### 📊 Dashboard
+- Visão geral com métricas de alunos ativos, aulas concluídas, receita mensal e previsão total
+- Seletor de mês para navegar entre períodos
+- Alertas de pagamentos pendentes e vencidos
+- Próximas aulas nos próximos 7 dias
 
-### 🎯 Core Framework
-- **⚡ Next.js 16** - The React framework for production with App Router
-- **📘 TypeScript 5** - Type-safe JavaScript for better developer experience
-- **🎨 Tailwind CSS 4** - Utility-first CSS framework for rapid UI development
+### 👨‍🎓 Alunos
+- Cadastro completo com nome, e-mail, telefone, responsável, disciplina, turma e valor da mensalidade
+- Busca e filtros por status, disciplina e turma
+- Controle de aulas contratadas e tempo de estudo
 
-### 🧩 UI Components & Styling
-- **🧩 shadcn/ui** - High-quality, accessible components built on Radix UI
-- **🎯 Lucide React** - Beautiful & consistent icon library
-- **🌈 Framer Motion** - Production-ready motion library for React
-- **🎨 Next Themes** - Perfect dark mode in 2 lines of code
+### 📅 Aulas
+- Calendário mensal com aulas codificadas por cor (agendada, concluída, cancelada, remarcada)
+- Gerenciamento de ciclos de aulas com marcadores de "Fim do Ciclo"
+- Lançamento de conteúdo abordado e observações
+- Relatórios e download
 
-### 📋 Forms & Validation
-- **🎣 React Hook Form** - Performant forms with easy validation
-- **✅ Zod** - TypeScript-first schema validation
+### 💰 Financeiro
+- Controle de pagamentos de alunos com tabela ordenável
+- Geração automática de pagamentos pendentes
+- Resumo com total recebido, pendente e em atraso
+- Mensalidades de professores (plataforma)
 
-### 🔄 State Management & Data Fetching
-- **🐻 Zustand** - Simple, scalable state management
-- **🔄 TanStack Query** - Powerful data synchronization for React
-- **🌐 Fetch** - Promise-based HTTP request
+### 📈 BI & Analytics
+- Gráficos de tendência de receita (Recharts)
+- Distribuição de alunos e taxas de conclusão de aulas
+- Rankings de alunos por aulas e retenção
+- Alertas inteligentes
 
-### 🗄️ Database & Backend
-- **🗄️ Prisma** - Next-generation TypeScript ORM
-- **🔐 NextAuth.js** - Complete open-source authentication solution
+### 👑 Painel Administrativo
+- Gerenciamento de professores e permissões (admin/teacher)
+- Controle de expiração de contrato e isenção de mensalidade
+- Definição de senha via API
+- Importação de dados do sistema legado (Base44)
+- Geração de dados fictícios para testes
+- Backup completo em JSON com filtros por professor/alunos
 
-### 🎨 Advanced UI Features
-- **📊 TanStack Table** - Headless UI for building tables and datagrids
-- **🖱️ DND Kit** - Modern drag and drop toolkit for React
-- **📊 Recharts** - Redefined chart library built with React and D3
-- **🖼️ Sharp** - High performance image processing
+## 🚀 Tecnologias
 
-### 🌍 Internationalization & Utilities
-- **🌍 Next Intl** - Internationalization library for Next.js
-- **📅 Date-fns** - Modern JavaScript date utility library
-- **🪝 ReactUse** - Collection of essential React hooks for modern development
+| Categoria | Tecnologia |
+|---|---|
+| **Framework** | Next.js 16 (App Router) + React 19 |
+| **Linguagem** | TypeScript 5 |
+| **Banco de Dados** | Firebase Firestore |
+| **Autenticação** | Firebase Auth + Firebase Admin SDK |
+| **Estado/Cache** | TanStack React Query |
+| **Estilização** | Tailwind CSS 4 + shadcn/ui |
+| **Animações** | Framer Motion |
+| **Ícones** | Lucide React |
+| **Gráficos** | Recharts |
+| **Datas** | date-fns (locale ptBR) |
+| **Notificações** | Sonner |
+| **Tema** | next-themes (dark/light) |
+| **Runtime** | Bun |
+| **Deploy** | Next.js Standalone + Caddy |
 
-## 🎯 Why This Scaffold?
-
-- **🏎️ Fast Development** - Pre-configured tooling and best practices
-- **🎨 Beautiful UI** - Complete shadcn/ui component library with advanced interactions
-- **🔒 Type Safety** - Full TypeScript configuration with Zod validation
-- **📱 Responsive** - Mobile-first design principles with smooth animations
-- **🗄️ Database Ready** - Prisma ORM configured for rapid backend development
-- **🔐 Auth Included** - NextAuth.js for secure authentication flows
-- **📊 Data Visualization** - Charts, tables, and drag-and-drop functionality
-- **🌍 i18n Ready** - Multi-language support with Next Intl
-- **🚀 Production Ready** - Optimized build and deployment settings
-- **🤖 AI-Friendly** - Structured codebase perfect for AI assistance
-
-## 🚀 Quick Start
+## 🚀 Início Rápido
 
 ```bash
-# Install dependencies
+# Instalar dependências
 bun install
 
-# Start development server
+# Configurar variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais do Firebase
+
+# Iniciar em desenvolvimento
 bun run dev
 
-# Build for production
+# Build para produção
 bun run build
 
-# Start production server
+# Iniciar servidor de produção
 bun start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your application running.
-
-## 🤖 Powered by Z.ai
-
-This scaffold is optimized for use with [Z.ai](https://chat.z.ai) - your AI assistant for:
-
-- **💻 Code Generation** - Generate components, pages, and features instantly
-- **🎨 UI Development** - Create beautiful interfaces with AI assistance  
-- **🔧 Bug Fixing** - Identify and resolve issues with intelligent suggestions
-- **📝 Documentation** - Auto-generate comprehensive documentation
-- **🚀 Optimization** - Performance improvements and best practices
-
-Ready to build something amazing? Start chatting with Z.ai at [chat.z.ai](https://chat.z.ai) and experience the future of AI-powered development!
-
-## 📁 Project Structure
+## 📁 Estrutura
 
 ```
 src/
-├── app/                 # Next.js App Router pages
-├── components/          # Reusable React components
-│   └── ui/             # shadcn/ui components
-├── hooks/              # Custom React hooks
-└── lib/                # Utility functions and configurations
+├── app/                  # Páginas (App Router)
+│   ├── page.tsx          # Dashboard
+│   ├── login/            # Autenticação
+│   ├── admin/            # Painel administrativo
+│   ├── students/         # Gerenciamento de alunos
+│   ├── lessons/          # Gerenciamento de aulas
+│   ├── finance/          # Financeiro
+│   ├── bi/               # Business Intelligence
+│   ├── teachers/         # Professores
+│   ├── teacher-payments/ # Mensalidades de professores
+│   └── api/              # API Routes
+├── components/           # Componentes React
+│   └── ui/               # Componentes shadcn/ui
+├── contexts/             # Contextos (AuthContext)
+├── hooks/                # Hooks customizados
+├── lib/                  # Utilitários e Firebase
+└── providers/            # Providers (ThemeProvider)
 ```
 
-## 🎨 Available Features & Components
+## 📄 Licença
 
-This scaffold includes a comprehensive set of modern web development tools:
-
-### 🧩 UI Components (shadcn/ui)
-- **Layout**: Card, Separator, Aspect Ratio, Resizable Panels
-- **Forms**: Input, Textarea, Select, Checkbox, Radio Group, Switch
-- **Feedback**: Alert, Toast (Sonner), Progress, Skeleton
-- **Navigation**: Breadcrumb, Menubar, Navigation Menu, Pagination
-- **Overlay**: Dialog, Sheet, Popover, Tooltip, Hover Card
-- **Data Display**: Badge, Avatar, Calendar
-
-### 📊 Advanced Data Features
-- **Tables**: Powerful data tables with sorting, filtering, pagination (TanStack Table)
-- **Charts**: Beautiful visualizations with Recharts
-- **Forms**: Type-safe forms with React Hook Form + Zod validation
-
-### 🎨 Interactive Features
-- **Animations**: Smooth micro-interactions with Framer Motion
-- **Drag & Drop**: Modern drag-and-drop functionality with DND Kit
-- **Theme Switching**: Built-in dark/light mode support
-
-### 🔐 Backend Integration
-- **Authentication**: Ready-to-use auth flows with NextAuth.js
-- **Database**: Type-safe database operations with Prisma
-- **API Client**: HTTP requests with Fetch + TanStack Query
-- **State Management**: Simple and scalable with Zustand
-
-### 🌍 Production Features
-- **Internationalization**: Multi-language support with Next Intl
-- **Image Optimization**: Automatic image processing with Sharp
-- **Type Safety**: End-to-end TypeScript with Zod validation
-- **Essential Hooks**: 100+ useful React hooks with ReactUse for common patterns
-
-## 🤝 Get Started with Z.ai
-
-1. **Clone this scaffold** to jumpstart your project
-2. **Visit [chat.z.ai](https://chat.z.ai)** to access your AI coding assistant
-3. **Start building** with intelligent code generation and assistance
-4. **Deploy with confidence** using the production-ready setup
-
----
-
-Built with ❤️ for the developer community. Supercharged by [Z.ai](https://chat.z.ai) 🚀
+Projeto privado — todos os direitos reservados.
