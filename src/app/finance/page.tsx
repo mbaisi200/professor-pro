@@ -250,7 +250,7 @@ export default function FinancePage() {
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<'paymentDate' | 'studentName' | 'amount' | 'status' | 'referenceMonth' | 'dueDate'>('dueDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

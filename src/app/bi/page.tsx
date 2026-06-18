@@ -70,6 +70,7 @@ const CYAN = '#00F2FE';
 const PURPLE = '#8A2BE2';
 const EMERALD = '#10B981';
 const AMBER = '#F59E0B';
+const ORANGE = '#F97316';
 const ROSE = '#F43F5E';
 
 // Chart colors
@@ -515,7 +516,7 @@ export default function BIPage() {
   // Lesson calculations
   const completedLessonsThisMonth = useMemo(() => {
     return lessons.filter(l => {
-      if (l.status !== 'completed' || l.endOfCycle) return false;
+      if (!['completed', 'absent'].includes(l.status) || l.endOfCycle) return false;
       const lessonDate = parseISO(l.date);
       return lessonDate >= monthStart && lessonDate <= monthEnd;
     });
@@ -566,12 +567,14 @@ export default function BIPage() {
   const lessonsByStatus = useMemo(() => {
     const allLessons = lessons.filter(l => !l.endOfCycle);
     const completed = allLessons.filter(l => l.status === 'completed').length;
+    const absent = allLessons.filter(l => l.status === 'absent').length;
     const scheduled = allLessons.filter(l => l.status === 'scheduled').length;
     const cancelled = allLessons.filter(l => l.status === 'cancelled').length;
     const rescheduled = allLessons.filter(l => l.status === 'rescheduled').length;
 
     return [
       { name: 'Concluídas', value: completed, color: EMERALD },
+      { name: 'Faltas', value: absent, color: ORANGE },
       { name: 'Agendadas', value: scheduled, color: CYAN },
       { name: 'Canceladas', value: cancelled, color: ROSE },
       { name: 'Remarcadas', value: rescheduled, color: AMBER },
@@ -584,7 +587,7 @@ export default function BIPage() {
     const counts = [0, 0, 0, 0, 0, 0, 0];
 
     lessons
-      .filter(l => !l.endOfCycle && l.status === 'completed')
+      .filter(l => !l.endOfCycle && ['completed', 'absent'].includes(l.status))
       .forEach(l => {
         const date = parseISO(l.date);
         const dayOfWeek = getDay(date);

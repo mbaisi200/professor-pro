@@ -467,7 +467,7 @@ export async function checkAndManageLessonCycle(
     const lesson = allLessons[i];
     if ((lesson as any).endOfCycle === true) continue;
     
-    if (lesson.status === 'completed') {
+    if (lesson.status === 'completed' || lesson.status === 'absent') {
       completedInCurrentCycle++;
     }
   }
@@ -569,7 +569,7 @@ export async function countCompletedLessonsInCurrentCycle(
     const lesson = allLessons[i];
     if ((lesson as any).endOfCycle === true) continue;
     
-    if (lesson.status === 'completed') {
+    if (lesson.status === 'completed' || lesson.status === 'absent') {
       completedCount++;
     }
   }

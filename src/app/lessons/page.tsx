@@ -75,6 +75,7 @@ const statusColors: Record<string, string> = {
   completed: 'bg-emerald-500',
   cancelled: 'bg-rose-500',
   rescheduled: 'bg-amber-500',
+  absent: 'bg-orange-500',
   cycle_end: 'bg-purple-500',
 };
 
@@ -86,6 +87,7 @@ const statusLabels: Record<string, string> = {
   completed: 'Concluída',
   cancelled: 'Cancelada',
   rescheduled: 'Remarcada',
+  absent: 'Falta',
   cycle_end: 'Fim do Ciclo',
 };
 
@@ -250,8 +252,9 @@ function LessonForm({
               }`}
             >
               <option value="scheduled">Agendada</option>
-              <option value="completed">Concluída</option>
               <option value="cancelled">Cancelada</option>
+              <option value="completed">Concluída</option>
+              <option value="absent">Falta</option>
               <option value="rescheduled">Remarcada</option>
               <option value="cycle_end" disabled={!form.studentId}>🎯 Final do Ciclo</option>
             </select>
@@ -397,6 +400,16 @@ function LessonDetail({
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Check className="w-4 h-4 mr-1" /> Concluída
+                  </Button>
+                )}
+                {lesson.status !== 'absent' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onStatusChange('absent')}
+                    className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                  >
+                    <X className="w-4 h-4 mr-1" /> Falta
                   </Button>
                 )}
                 {lesson.status !== 'cancelled' && (
@@ -580,7 +593,7 @@ export default function LessonsPage() {
               ? `Ciclo fechado manualmente em ${data.date}. Novo ciclo a partir desta data.`
               : 'Ciclo fechado manualmente. Configure as aulas contratadas do aluno.'
           });
-        } else if (data.studentId && data.status === 'completed') {
+        } else if (data.studentId && ['completed', 'absent'].includes(data.status)) {
           const cycleResult = await checkAndManageLessonCycle(
             data.studentId,
             data.status,
@@ -781,7 +794,7 @@ export default function LessonsPage() {
 
   // Exportar PDF
   const handleExportPDF = () => {
-    const reportData = getFilteredLessonsForReport();
+    const reportData = getFilteredLessonsForReport().filter(l => !l.endOfCycle);
     const studentName = reportStudent === 'all' 
       ? 'Todos os Alunos' 
       : students.find(s => s.id === reportStudent)?.name || 'Aluno';
@@ -824,6 +837,7 @@ export default function LessonsPage() {
           .status-scheduled { color: #2563eb; font-weight: bold; }
           .status-cancelled { color: #dc2626; font-weight: bold; }
           .status-rescheduled { color: #d97706; font-weight: bold; }
+          .status-absent { color: #ea580c; font-weight: bold; }
           .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; }
           @media print {
             body { padding: 0; }
@@ -900,7 +914,7 @@ export default function LessonsPage() {
 
   // Exportar Excel (CSV)
   const handleExportExcel = () => {
-    const reportData = getFilteredLessonsForReport();
+    const reportData = getFilteredLessonsForReport().filter(l => !l.endOfCycle);
     
     // Criar CSV para Excel
     const headers = ['Data', 'Horário', 'Aluno', 'Matéria', 'Status', 'Conteúdo'];

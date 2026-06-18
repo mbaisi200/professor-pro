@@ -325,10 +325,10 @@ export default function Dashboard() {
     );
   });
 
-  // Aulas concluídas - IGNORA marcadores de final de ciclo
+  // Aulas concluídas (inclui faltas) - IGNORA marcadores de final de ciclo
   // REGRA: Aulas com endOfCycle=true são apenas marcadores, não aulas reais
   const completedLessons = lessons
-    .filter((l) => l.status === 'completed' && l.date && l.endOfCycle !== true)
+    .filter((l) => ['completed', 'absent'].includes(l.status) && l.date && l.endOfCycle !== true)
     .filter((l) => {
       const lessonDate = parseISO(l.date);
       return lessonDate >= monthStart && lessonDate <= monthEnd;
