@@ -38,6 +38,7 @@ import {
   parseISO,
   isBefore,
   startOfDay,
+  endOfDay,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -469,6 +470,12 @@ export default function LessonsPage() {
   const [showReport, setShowReport] = useState(false);
   const [reportStudent, setReportStudent] = useState<string>('all');
   const [reportPeriod, setReportPeriod] = useState<string>('all');
+  const [customStartDate, setCustomStartDate] = useState<string>(
+    format(startOfMonth(new Date()), 'yyyy-MM-dd')
+  );
+  const [customEndDate, setCustomEndDate] = useState<string>(
+    format(new Date(), 'yyyy-MM-dd')
+  );
   const [reportCycle, setReportCycle] = useState<string>('all');
   const [sortField, setSortField] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -733,6 +740,10 @@ export default function LessonsPage() {
           startDate = new Date(now.getFullYear(), 0, 1);
           endDate = new Date(now.getFullYear(), 11, 31);
           break;
+        case 'custom':
+          startDate = customStartDate ? startOfDay(parseISO(customStartDate)) : new Date(0);
+          endDate = customEndDate ? endOfDay(parseISO(customEndDate)) : new Date(8640000000000000);
+          break;
         default:
           startDate = startOfMonth(now);
           endDate = endOfMonth(now);
@@ -792,6 +803,29 @@ export default function LessonsPage() {
     });
   };
 
+  // Rótulo legível do período selecionado (usado nos relatórios)
+  const getPeriodLabel = () => {
+    switch (reportPeriod) {
+      case 'all':
+        return 'Todo Período';
+      case 'current_month':
+        return format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
+      case 'last_month':
+        return format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), "MMMM 'de' yyyy", { locale: ptBR });
+      case 'last_3_months':
+        return 'Últimos 3 meses';
+      case 'current_year':
+        return `Ano de ${new Date().getFullYear()}`;
+      case 'custom': {
+        const start = customStartDate ? format(parseISO(customStartDate), 'dd/MM/yyyy', { locale: ptBR }) : '...';
+        const end = customEndDate ? format(parseISO(customEndDate), 'dd/MM/yyyy', { locale: ptBR }) : '...';
+        return `${start} até ${end}`;
+      }
+      default:
+        return reportPeriod;
+    }
+  };
+
   // Exportar PDF
   const handleExportPDF = () => {
     const reportData = getFilteredLessonsForReport().filter(l => !l.endOfCycle);
@@ -799,13 +833,7 @@ export default function LessonsPage() {
       ? 'Todos os Alunos' 
       : students.find(s => s.id === reportStudent)?.name || 'Aluno';
     
-    const periodLabel: Record<string, string> = {
-      'all': 'Todo Período',
-      'current_month': format(new Date(), "MMMM 'de' yyyy", { locale: ptBR }),
-      'last_month': format(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1), "MMMM 'de' yyyy", { locale: ptBR }),
-      'last_3_months': 'Últimos 3 meses',
-      'current_year': `Ano de ${new Date().getFullYear()}`,
-    };
+    const periodLabel = getPeriodLabel();
 
     // Criar HTML para impressão
     const printWindow = window.open('', '_blank');
@@ -858,7 +886,7 @@ export default function LessonsPage() {
           </div>
           <div class="info-item">
             <label>Período</label>
-            <span>${periodLabel[reportPeriod] || reportPeriod}</span>
+            <span>${periodLabel}</span>
           </div>
           <div class="info-item">
             <label>Total de Aulas</label>
@@ -1096,7 +1124,35 @@ export default function LessonsPage() {
                         <option value="last_month">Mês Anterior</option>
                         <option value="last_3_months">Últimos 3 Meses</option>
                         <option value="current_year">Ano Atual</option>
+                        <option value="custom">Personalizado</option>
                       </select>
+                      {reportPeriod === 'custom' && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Input
+                            type="date"
+                            value={customStartDate}
+                            max={customEndDate || undefined}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className={`flex-1 ${
+                              darkMode
+                                ? 'bg-slate-700 border-slate-600 text-white'
+                                : 'bg-white border-slate-200'
+                            }`}
+                          />
+                          <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>até</span>
+                          <Input
+                            type="date"
+                            value={customEndDate}
+                            min={customStartDate || undefined}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className={`flex-1 ${
+                              darkMode
+                                ? 'bg-slate-700 border-slate-600 text-white'
+                                : 'bg-white border-slate-200'
+                            }`}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Filtro Ciclo */}
