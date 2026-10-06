@@ -62,23 +62,53 @@ Sistema completo para professores particulares gerenciarem alunos, aulas, finan�
 
 ## 🚀 Início Rápido
 
+### 1. Instalar dependências
+
 ```bash
-# Instalar dependências
-bun install
-
-# Configurar variáveis de ambiente
-cp .env.example .env.local
-# Edite .env.local com suas credenciais do Firebase
-
-# Iniciar em desenvolvimento
-bun run dev
-
-# Build para produção
-bun run build
-
-# Iniciar servidor de produção
-bun start
+npm install
+# ou, se preferir Bun:
+# bun install
 ```
+
+### 2. Configurar as variáveis de ambiente
+
+```bash
+cp .env.example .env.local
+```
+
+Depois abra o `.env.local` e preencha com os dados do seu projeto Firebase:
+
+| Variável | Onde encontrar | Quando é necessária |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Console → ⚙️ Configurações do projeto → Seus apps → app Web | Sempre |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | idem | Sempre |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | idem | Sempre |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | idem | Sempre |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | idem | Sempre |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | idem | Sempre |
+| `FIREBASE_CLIENT_EMAIL` | ⚙️ Configurações do projeto → **Contas de serviço** → Gerar nova chave privada | Só para criar/excluir usuários no `/admin` |
+| `FIREBASE_PRIVATE_KEY` | idem (campo `private_key` do JSON baixado) | Só para criar/excluir usuários no `/admin` |
+
+> As seis `NEXT_PUBLIC_*` são **públicas** — ficam embutidas no bundle do navegador, é normal que apareçam nas ferramentas de desenvolvedor.
+> Já `FIREBASE_CLIENT_EMAIL` e `FIREBASE_PRIVATE_KEY` são **secretas**: o acesso ao Firestore é controlado pelas regras (`firestore.rules`), não por elas.
+> O `.env.local` é ignorado pelo Git, então suas credenciais nunca são versionadas.
+
+### 3. Rodar o projeto
+
+```bash
+# Desenvolvimento em http://localhost:3000
+npm run dev
+
+# Build de produção (gera o .next/standalone)
+npm run build
+
+# Servidor de produção
+npm start
+```
+
+> **Fallback WebAssembly:** em ambientes restritos, onde o binário nativo do SWC não carrega, use `npm run dev:wasm`.
+>
+> **Bun:** o script `npm start` executa `bun .next/standalone/server.js`, então o start de produção exige o Bun instalado. Se preferir Node, rode `NODE_ENV=production node .next/standalone/server.js`. O desenvolvimento e o build funcionam com qualquer um dos dois.
 
 ## 📁 Estrutura
 
