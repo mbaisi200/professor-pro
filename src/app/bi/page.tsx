@@ -563,6 +563,78 @@ export default function BIPage() {
     return months;
   }, [payments, students, today]);
 
+  // Revenue forecast for next month (simple linear regression)
+  const revenueForecast = useMemo(() => {
+    // Need at least 2 data points for forecasting
+    if (revenueByMonth.length < 2) {
+      return {
+        nextMonth: format(subMonths(today, -1), 'MMM', { locale: ptBR }),
+        predictedRevenue: 0,
+        confidence: 'low',
+        trend: 'insufficient-data'
+      };
+    }
+
+    // Extract data for regression (last 3 months or all available, whichever is smaller)
+    const data = revenueByMonth.slice(-Math.min(3, revenueByMonth.length));
+    const n = data.length;
+
+    if (n < 2) {
+      return {
+        nextMonth: format(subMonths(today, -1), 'MMM', { locale: ptBR }),
+        predictedRevenue: 0,
+        confidence: 'low',
+        trend: 'insufficient-data'
+      };
+    }
+
+    // Calculate linear regression: y = mx + b
+    // where x is month index (0, 1, 2, ...) and y is revenue
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+    data.forEach((point, index) => {
+      const x = index; // 0, 1, 2, ...
+      const y = point.receita;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumXX += x * x;
+    });
+
+    // Calculate slope (m) and intercept (b)
+    const m = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const b = (sumY - m * sumX) / n;
+
+    // Predict next month (x = n)
+    const predictedRevenue = m * n + b;
+
+    // Calculate R-squared for confidence measure
+    const meanY = sumY / n;
+    let ssTot = 0, ssRes = 0;
+
+    data.forEach((point, index) => {
+      const x = index;
+      const y = point.receita;
+      const yPred = m * x + b;
+      ssTot += Math.pow(y - meanY, 2);
+      ssRes += Math.pow(y - yPred, 2);
+    });
+
+    const rSquared = ssTot > 0 ? (1 - ssRes / ssTot) : 0;
+    const confidence = rSquared >= 0.7 ? 'high' : rSquared >= 0.4 ? 'medium' : 'low';
+
+    // Determine trend
+    const trend = m > 0 ? 'up' : m < 0 ? 'down' : 'stable';
+
+    return {
+      nextMonth: format(subMonths(today, -1), 'MMM', { locale: ptBR }),
+      predictedRevenue: Math.max(0, predictedRevenue), // Ensure non-negative
+      confidence,
+      trend,
+      rSquared
+    };
+  }, [revenueByMonth, today]);
+
   // Lessons by status
   const lessonsByStatus = useMemo(() => {
     const allLessons = lessons.filter(l => !l.endOfCycle);
@@ -925,6 +997,107 @@ export default function BIPage() {
             />
           </div>
 
+          {/* Revenue Forecast Section */}
+          <div className="mb-6">
+            {/* Forecast Value and Label */}
+            <div className="mb-4">
+              <div className="text-center">
+                <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  R$ {revenueForecast.predictedRevenue.toFixed(0)}
+                </p>
+                <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                  previsão para {revenueForecast.nextMonth}
+                </p>
+              </div>
+            </div>
+
+            {/* Confidence and Trend */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                  Confiança:
+                </p>
+                <p className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-600'} ${
+                  revenueForecast.confidence === 'high' ? 'text-emerald-500' :
+                  revenueForecast.confidence === 'medium' ? 'text-amber-500' : 'text-rose-500'
+                }`}>
+                  {revenueForecast.confidence === 'high' ? 'Alta' :
+                  revenueForecast.confidence === 'medium' ? 'Média' : 'Baixa'}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                  Tendência:
+                </p>
+                <p className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-600'} ${
+                  revenueForecast.trend === 'up' ? 'text-emerald-500' :
+                  revenueForecast.trend === 'down' ? 'text-rose-500' : 'text-gray-500'
+                }`}>
+                  {revenueForecast.trend === 'up' ? 'Crescente' :
+                  revenueForecast.trend === 'down' ? 'Decrescente' : 'Estável'}
+                </p>
+              </div>
+            </div>
+
+            {/* Chart (only if we have sufficient data) */}
+            {revenueByMonth.length > 0 && (
+              <div className="mt-4">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={[
+                    ...revenueByMonth.map(month => ({
+                      month: month.month,
+                      receita: month.receita,
+                    })),
+                    {
+                      month: revenueForecast.nextMonth,
+                      receita: revenueForecast.predictedRevenue,
+                    }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#ffffff10' : '#e2e8f0'} />
+                    <XAxis dataKey="month" stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={12} />
+                    <YAxis stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={12}
+                           tickFormatter={(v) => v === 0 ? 'R$0' : `R$${v/1000}k`} />
+                    <Tooltip content={(props) => {
+                      const { active, payload, label } = props;
+                      if (active && payload && payload.length) {
+                        const item = payload[0];
+                        const isForecast = label === revenueForecast.nextMonth;
+                        return (
+                          <div className={`rounded-lg p-3 shadow-xl border ${
+                            darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                          }`}>
+                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                              {label} ({isForecast ? 'Previsão' : 'Histórico'})
+                            </p>
+                            <p className="text-sm" style={{ color: item.color }}>
+                              Receita: {item.value !== undefined && item.value !== null
+                                ? Number(item.value).toLocaleString('pt-BR', {
+                                    style: 'currency', currency: 'BRL'
+                                  })
+                                : 'R$0'}
+                              </p>
+                            </div>
+                        );
+                      }
+                      return null;
+                    }} />
+                    {revenueByMonth.map((month, index) => (
+                      <Bar key={`historical-${index}`}
+                           dataKey="receita"
+                           fill={EMERALD}
+                           name="Receita Histórica" />
+                    ))}
+                    <Bar key="forecast"
+                         dataKey="receita"
+                         fill={EMERALD}
+                         name="Previsão de Receita"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
           {/* Charts Row 1 */}
           <div className="grid lg:grid-cols-2 gap-6 mb-8">
             {/* Revenue Evolution */}
@@ -1036,6 +1209,127 @@ export default function BIPage() {
               </div>
             </motion.div>
           </div>
+
+          {/* Revenue Forecast Chart */}
+          <div className="mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className={`rounded-2xl p-6 ${
+                darkMode ? 'glass-dark' : 'bg-white border border-slate-100 shadow-lg'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className={`text-lg font-semibold flex items-center gap-2 ${
+                  darkMode ? 'text-white' : 'text-slate-800'
+                }`}>
+                  <TrendingUp className="w-5 h-5" style={{ color: EMERALD }} />
+                  Previsão de Receita para Próximo Mês
+                </h2>
+                {revenueForecast.confidence !== 'low' && (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                      Confiança:
+                    </span>
+                    <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-800'} ${
+                      revenueForecast.confidence === 'high' ? 'text-emerald-500' :
+                      revenueForecast.confidence === 'medium' ? 'text-amber-500' : 'text-rose-500'
+                    }`}>
+                      {revenueForecast.confidence === 'high' ? 'Alta' :
+                      revenueForecast.confidence === 'medium' ? 'Média' : 'Baixa'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2">
+                <div className="text-center">
+                  <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    R$ {revenueForecast.predictedRevenue.toFixed(0)}
+                  </p>
+                  <p className={`text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                    previsão para {revenueForecast.nextMonth}
+                  </p>
+                </div>
+              </div>
+                {/* Prepare chart data without modifying original objects */}
+                {!revenueByMonth.length && (
+                  <p className="text-center text-sm col-span-2">
+                   Dados insuficientes para gerar previsão
+                  </p>
+                )}
+                {revenueByMonth.length > 0 && (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={[
+                      ...revenueByMonth.map(month => ({
+                        month: month.month,
+                        receita: month.receita,
+                      })),
+                      {
+                        month: revenueForecast.nextMonth,
+                        receita: revenueForecast.predictedRevenue,
+                      }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#ffffff10' : '#e2e8f0'} />
+                      <XAxis dataKey="month" stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={12} />
+                      <YAxis stroke={darkMode ? '#94a3b8' : '#64748b'} fontSize={12}
+                             tickFormatter={(v) => v === 0 ? 'R$0' : `R$${v/1000}k`} />
+                      <Tooltip content={(props) => {
+                        const { active, payload, label } = props;
+                        if (active && payload && payload.length) {
+                          const item = payload[0];
+                          const isForecast = label === revenueForecast.nextMonth;
+                          return (
+                            <div className={`rounded-lg p-3 shadow-xl border ${
+                              darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                            }`}>
+                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                                {label} ({isForecast ? 'Previsão' : 'Histórico'})
+                              </p>
+                              <p className="text-sm" style={{ color: item.color }}>
+                                Receita: {item.value !== undefined && item.value !== null
+                                  ? Number(item.value).toLocaleString('pt-BR', {
+                                      style: 'currency', currency: 'BRL'
+                                    })
+                                  : 'R$0'}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }} />
+                      {revenueByMonth.map((month, index) => (
+                        <Bar key={`historical-${index}`}
+                             dataKey="receita"
+                             fill={EMERALD}
+                             name="Receita Histórica" />
+                      ))}
+                      <Bar key="forecast"
+                           dataKey="receita"
+                           fill={EMERALD}
+                           name="Previsão de Receita"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+
+                {revenueForecast.trend !== 'insufficient-data' && (
+                  <div className="mt-4 text-center">
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                      Tendência:
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'} ${
+                        revenueForecast.trend === 'up' ? 'text-emerald-500' :
+                        revenueForecast.trend === 'down' ? 'text-rose-500' : 'text-gray-500'
+                      }`}>
+                        {revenueForecast.trend === 'up' ? 'Crescente' :
+                        revenueForecast.trend === 'down' ? 'Decrescente' : 'Estável'}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </div>
 
           {/* Charts Row 2 */}
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
